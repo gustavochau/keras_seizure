@@ -3,4 +3,5 @@
 *.png
 *.bmp
 *.jpg
-
+*.xml
+*.iml
