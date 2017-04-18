@@ -11,8 +11,16 @@ from scipy.io import loadmat
 from keras.utils import np_utils
 from keras import backend as K
 import matplotlib.pyplot as plt
-
+from keras.layers import Dense
+from keras.layers import Dropout
+from keras.layers import Flatten
+from keras.constraints import maxnorm
+from keras.optimizers import SGD
+from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import MaxPooling2D
+from keras.utils import np_utils
 import numpy as np
+
 
 def comp_metric(y_true, y_pred):
     fp = sum(np.logical_and(y_true == 0, y_pred == 1))
@@ -94,33 +102,50 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
 
 
 if __name__ == "__main__":
+    K.set_image_dim_ordering('th')
+    # fix random seed for reproducibility
+    seed = 7
+    np.random.seed(seed)
+
     main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada/'
 
-    batch_size = 100
-    num_classes = 2
-    epochs = 25
-
-    model = Sequential()
-    model.add(Dense(10, input_shape=(23 * 512,)))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(10))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(2))
-    model.add(Activation('softmax'))
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=RMSprop(),
-                  metrics=['accuracy'])
     los = 16
+    num_classes = 2
     X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=los,
                                                   isTrain=True)
+
+    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=los,
+                                                isTrain=False)
+
+    # Create the model
+    model = Sequential()
+    model.add(
+        Conv2D(32, (4, 1), input_shape=(1, 512, 23), padding='valid', activation='relu', kernel_constraint=maxnorm(3)))
+    #model.add(Dropout(0.2))
+    model.add(MaxPooling2D(pool_size=(2, 1), padding='valid'))
+    model.add(Conv2D(32, (4, 1), activation='relu', padding='valid', kernel_constraint=maxnorm(3)))
+    model.add(MaxPooling2D(pool_size=(2, 1),padding='valid'))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu', kernel_constraint=maxnorm(3)))
+    #model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+
+    # Compile model
+    epochs = 20
+    lrate = 0.01
+    decay = lrate / epochs
+    sgd = SGD(lr=lrate, momentum=0.9, nesterov=False)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    print(model.summary())
+
+    # Fit the model
+    model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=epochs, batch_size=32)
+
+
+
     # history = model.fit_generator(data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=1, isTrain=True, batchSize=100), samples_per_epoch=60000 \
     #                              , nb_epoch=12, callbacks=[])
     # print(X_train.shape)
-    # X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=los,
-    #                                               isTrain=False)
     #
     # # scores = model.evaluate_generator(data_generator_mnist(False), val_samples=10000)
     # # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
@@ -135,13 +160,13 @@ if __name__ == "__main__":
     #                     epochs=epochs,
     #                     verbose=1)
     #
-    # score = model.evaluate(X_test, Y_test, verbose=1)
+    score = model.evaluate(X_test, Y_test, verbose=1)
     #
-    # y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-    # y_true = np.argmax(Y_test,axis=1)
-    # sensitivity, fp = comp_metric(y_true, y_pred)
+    y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
+    y_true = np.argmax(Y_test,axis=1)
+    sensitivity, fp = comp_metric(y_true, y_pred)
     #
-    # print('Test loss:', score[0])
-    # print('Test accuracy:', score[1])
-    # print('Test sensitivity:', sensitivity)
-    # print('Test # false positives:', fp)
+    print('Test loss:', score[0])
+    print('Test accuracy:', score[1])
+    print('Test sensitivity:', sensitivity)
+    print('Test # false positives:', fp)
