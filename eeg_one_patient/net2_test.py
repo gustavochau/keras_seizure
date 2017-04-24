@@ -10,7 +10,7 @@ from os import listdir
 from scipy.io import loadmat
 from keras.utils import np_utils
 from keras import backend as K
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from keras.layers import Dense
 from keras.layers import Dropout
 from keras.layers import Flatten
