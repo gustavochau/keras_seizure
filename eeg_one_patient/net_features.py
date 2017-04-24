@@ -13,6 +13,7 @@ from keras import backend as K
 from keras import regularizers
 import matplotlib.pyplot as plt
 import numpy as np
+from keras import metrics
 
 def comp_metric(y_true, y_pred):
     fp = sum(np.logical_and(y_true == 0, y_pred == 1))
@@ -73,24 +74,22 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
 if __name__ == "__main__":
     main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada/'
 
-    batch_size = 500
+    batch_size = 8000
     num_classes = 2
-    epochs = 500
+    epochs = 25
 
     model = Sequential()
-    model.add(Dense(512, activation='relu', input_shape=(552,), kernel_regularizer=regularizers.l2(5.01)))
-    model.add(Dense(256, activation='relu', kernel_regularizer=regularizers.l2(5.01)))
-    model.add(Dense(32, activation='relu', kernel_regularizer=regularizers.l2(5.01) ))
+    model.add(Dense(512, activation='sigmoid', input_shape=(552,), kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(256, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(32, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01) ))
     model.add(Dense(2, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
                   optimizer=RMSprop())
-    los = 4
+    los = 15
     X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=los,
                                                   isTrain=True)
 
-    # history = model.fit_generator(data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=1, isTrain=True, batchSize=100), samples_per_epoch=60000 \
-    #                              , nb_epoch=12, callbacks=[])
     print(X_train.shape)
     print(Y_train.shape)
 
@@ -101,22 +100,30 @@ if __name__ == "__main__":
     # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
     model.summary()
 
+    num_positive = sum(Y_train==1)
+    num_negative = sum(Y_train==0)
+
+    # class weight to compensate unbalanced training set
+    class_weight = {0: 1.,
+                    1: num_negative/num_positive}
+
     model.compile(loss='categorical_crossentropy',
                   optimizer=RMSprop(),
-                  metrics=['accuracy'])
+                  metrics=[metrics.categorical_accuracy])
 
-    # Y_train=np_utils.to_categorical(Y_train,2)
-    # history = model.fit(X_train, Y_train,
-    #                     batch_size=batch_size,
-    #                     epochs=epochs,
-    #                     verbose=1)
-    for k in range(0,epochs):
-        print(k)
-        X_sub, Y = balance_dataset(X_train, Y_train)
-        Y_sub = np_utils.to_categorical(Y, 2)
-        #print(X_sub.shape)
-        #print(Y_sub.shape)
-        model.train_on_batch(X_sub, Y_sub)
+    Y_train=np_utils.to_categorical(Y_train,2)
+    history = model.fit(X_train, Y_train,
+                        batch_size=batch_size,
+                        epochs=epochs,
+                        verbose=1,
+                        class_weight = class_weight)
+    # for k in range(0,epochs):
+    #     print(k)
+    #     X_sub, Y = balance_dataset(X_train, Y_train)
+    #     Y_sub = np_utils.to_categorical(Y, 2)
+    #     #print(X_sub.shape)
+    #     #print(Y_sub.shape)
+    #     model.train_on_batch(X_sub, Y_sub)
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
