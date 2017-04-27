@@ -5,7 +5,7 @@ import keras
 from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization
-from keras.optimizers import RMSprop
+from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
 from keras.utils import np_utils
@@ -90,15 +90,18 @@ if __name__ == "__main__":
     epochs = 100
 
     model = Sequential()
-    model.add(Dense(600, activation='relu', input_shape=(460,),kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(400, activation='relu', input_shape=(460,),kernel_regularizer=regularizers.l2(0.01)))
     model.add(BatchNormalization())
-    #model.add(Dropout(0.2))
-    model.add(Dense(150, activation='relu',kernel_regularizer=regularizers.l2(0.01) ))
-    #model.add(Dropout(0.2))
-    model.add(Dense(60, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
-    #model.add(Dropout(0.2))
+    model.add(Dropout(0.3))
+    model.add(Dense(200, activation='relu',kernel_regularizer=regularizers.l2(0.01) ))
+    model.add(Dropout(0.3))
+    model.add(Dense(80, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dropout(0.3))
+    model.add(Dense(30, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dropout(0.3))
     model.add(Dense(2, activation='softmax'))
 
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='sgd')
     los = 15
