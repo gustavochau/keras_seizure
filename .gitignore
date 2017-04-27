@@ -5,7 +5,7 @@
 *.jpg
 *.xml
 *.iml
-eeg_one_patient/.idea/workspace.xml
+/eeg_one_patient/.idea/workspace.xml
 **/.idea/**/workspace.xml
 
 .idea/**/workspace.xml
