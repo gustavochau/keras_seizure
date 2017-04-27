@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 from keras import metrics
-
+from keras.callbacks import EarlyStopping
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -165,10 +165,12 @@ if __name__ == "__main__":
                   metrics=[metrics.categorical_accuracy])
 
     Y_train=np_utils.to_categorical(Y_train,2)
+    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
-                        epochs=epochs,
-                        verbose=1, class_weight=class_weight)
+                        epochs=epochs, validation_split=0.1,
+                        verbose=1, class_weight=class_weight, callbacks=[early_stopping])
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
