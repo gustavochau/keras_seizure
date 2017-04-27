@@ -47,11 +47,11 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
     print(list_samples)
     if (isTrain):
         # take all series except for the one for testing
-        X = np.zeros(shape=(0, 552))
+        X = np.zeros(shape=(0, 460))
         Y = np.zeros(shape=(0, 1))
         for sample in list_samples:
             # if is not the one to be tested
-            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) + '_feats.mat')):
+            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) + '_feats_wav.mat')):
                 #print(sample)
                 mat_var = loadmat(patient_folder + '/' + sample)
                 X_train = mat_var['X']
@@ -63,7 +63,7 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
         return X, Y
     else:
         # take only the one for testing
-        mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) + '_feats.mat')
+        mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) + '_feats_wav.mat')
         X = mat_var['X']
         Y = mat_var['Y']
         #Y = np_utils.to_categorical(Y, 2)
@@ -72,16 +72,17 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
 
 
 if __name__ == "__main__":
-    main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada/'
+    main_folder = '/home/gustavo/Documents/'
 
-    batch_size = 8000
+    batch_size = 60000
     num_classes = 2
-    epochs = 25
+    epochs = 100
 
     model = Sequential()
-    model.add(Dense(512, activation='sigmoid', input_shape=(552,), kernel_regularizer=regularizers.l2(0.01)))
-    model.add(Dense(256, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01)))
-    model.add(Dense(32, activation='sigmoid', kernel_regularizer=regularizers.l2(0.01) ))
+    model.add(Dense(1024, activation='linear', input_shape=(460,)))
+    model.add(Dense(512, activation='linear'))
+    model.add(Dense(256, activation='linear'))
+    model.add(Dense(32, activation='linear'))
     model.add(Dense(2, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
