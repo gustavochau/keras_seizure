@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 from keras import metrics
+from keras.callbacks import EarlyStopping
 
 
 def create_class_weight(labels_dict,mu=0.15):
@@ -84,20 +85,20 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
 
 if __name__ == "__main__":
     main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada/'
-
+    np.random.seed(7)
     batch_size = 1000
     num_classes = 2
     epochs = 100
 
     model = Sequential()
-    model.add(Dense(400, activation='relu', input_shape=(460,),kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(400, activation='relu', input_shape=(460,), kernel_regularizer=regularizers.l2(0.01)))
     model.add(BatchNormalization())
     model.add(Dropout(0.3))
-    model.add(Dense(200, activation='relu',kernel_regularizer=regularizers.l2(0.01) ))
+    model.add(Dense(200, activation='relu', kernel_regularizer=regularizers.l2(0.01) ))
     model.add(Dropout(0.3))
-    model.add(Dense(80, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(80, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.3))
-    model.add(Dense(30, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(30, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.3))
     model.add(Dense(2, activation='softmax'))
 
@@ -132,11 +133,17 @@ if __name__ == "__main__":
                   optimizer='sgd',
                   metrics=[metrics.categorical_accuracy])
 
-    Y_train=np_utils.to_categorical(Y_train,2)
+    Y_train = np_utils.to_categorical(Y_train,2)
+    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
-                        epochs=epochs,
-                        verbose=1, class_weight=class_weight)
+                        epochs=epochs, validation_split=0.1,
+                        verbose=1, class_weight=class_weight, callbacks=[early_stopping])
+
+
+
+
     # for k in range(0,epochs):
     #     print(k)
     #     X_sub, Y = balance_dataset(X_train, Y_train)
