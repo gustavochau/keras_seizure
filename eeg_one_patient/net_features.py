@@ -4,7 +4,7 @@ from __future__ import print_function
 import keras
 from keras.datasets import mnist
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation
+from keras.layers import Dense, Dropout, Activation, BatchNormalization
 from keras.optimizers import RMSprop
 from os import listdir
 from scipy.io import loadmat
@@ -13,14 +13,25 @@ from keras import backend as K
 from keras import regularizers
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 from keras import metrics
+
+
+def create_class_weight(labels_dict,mu=0.15):
+    total = np.sum(labels_dict.values())
+    keys = labels_dict.keys()
+    class_weight = dict()
+    for key in keys:
+        score = math.log(mu*total/float(labels_dict[key]))
+        class_weight[key] = score if score > 1.0 else 1.0
+    return class_weight
 
 def comp_metric(y_true, y_pred):
     fp = sum(np.logical_and(y_true == 0, y_pred == 1))
     fn = sum(np.logical_and(y_true == 1, y_pred == 0))
     tp = sum(np.logical_and(y_true == 1, y_pred == 1))
     tn = sum(np.logical_and(y_true == 0, y_pred == 0))
-    sensitivity = tp/(tp + fn)
+    sensitivity = 100.0*float(tp) /float((tp + fn))
     return sensitivity, fp
 
 def balance_dataset(X,Y):
@@ -72,21 +83,24 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
 
 
 if __name__ == "__main__":
-    main_folder = '/home/gustavo/Documents/'
+    main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada/'
 
-    batch_size = 60000
+    batch_size = 1000
     num_classes = 2
     epochs = 100
 
     model = Sequential()
-    model.add(Dense(1024, activation='linear', input_shape=(460,)))
-    model.add(Dense(512, activation='linear'))
-    model.add(Dense(256, activation='linear'))
-    model.add(Dense(32, activation='linear'))
+    model.add(Dense(600, activation='relu', input_shape=(460,),kernel_regularizer=regularizers.l2(0.01)))
+    model.add(BatchNormalization())
+    #model.add(Dropout(0.2))
+    model.add(Dense(150, activation='relu',kernel_regularizer=regularizers.l2(0.01) ))
+    #model.add(Dropout(0.2))
+    model.add(Dense(60, activation='relu',kernel_regularizer=regularizers.l2(0.01)))
+    #model.add(Dropout(0.2))
     model.add(Dense(2, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer=RMSprop())
+                  optimizer='sgd')
     los = 15
     X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, leaveout_sample=los,
                                                   isTrain=True)
@@ -105,19 +119,21 @@ if __name__ == "__main__":
     num_negative = sum(Y_train==0)
 
     # class weight to compensate unbalanced training set
-    class_weight = {0: 1.,
-                    1: num_negative/num_positive}
+    # labels_dict = {0: float(num_negative),
+    #                 1: float(num_positive)}
+    # class_weight = create_class_weight(labels_dict, mu=0.15)
+    class_weight = {0: 1.0,
+                   1: float(num_negative) / float(num_positive)}
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer=RMSprop(),
+                  optimizer='sgd',
                   metrics=[metrics.categorical_accuracy])
 
     Y_train=np_utils.to_categorical(Y_train,2)
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
                         epochs=epochs,
-                        verbose=1,
-                        class_weight = class_weight)
+                        verbose=1, class_weight=class_weight)
     # for k in range(0,epochs):
     #     print(k)
     #     X_sub, Y = balance_dataset(X_train, Y_train)
@@ -130,9 +146,9 @@ if __name__ == "__main__":
     score = model.evaluate(X_test, Y_test, verbose=1)
 
     print('=== Training ====')
-    y_pred = np.argmax(model.predict(X_train, verbose=0), axis=1)
-    y_true = np.argmax(Y_train, axis=1)
-    sensitivity, fp = comp_metric(y_true, y_pred)
+    y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
+    y_true_t = np.argmax(Y_train, axis=1)
+    sensitivity, fp = comp_metric(y_true_t, y_pred_t)
     print('Test sensitivity:', sensitivity)
     print('Test # false positives:', fp)
 
@@ -143,3 +159,6 @@ if __name__ == "__main__":
     sensitivity, fp = comp_metric(y_true, y_pred)
     print('Test sensitivity:', sensitivity)
     print('Test # false positives:', fp)
+
+    plt.plot(y_pred)
+    plt.plot(y_true)
