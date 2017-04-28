@@ -16,6 +16,7 @@ import numpy as np
 import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
+from keras.layers import LSTM
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -122,9 +123,11 @@ if __name__ == "__main__":
     model.add(Conv1D(nb_filter=120, filter_length=3))
     model.add(Activation('relu'))
     model.add(MaxPooling1D())
+    model.add(LSTM(70))
     model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(BatchNormalization())
+    model.add(LSTM(200))
     model.add(Dense(400, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(200, activation='relu'))

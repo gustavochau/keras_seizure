@@ -4,7 +4,7 @@ from __future__ import print_function
 import keras
 from keras.datasets import mnist
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, BatchNormalization
+from keras.layers import Dense, Dropout, Activation, BatchNormalization, TimeDistributed
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
@@ -16,7 +16,7 @@ import numpy as np
 import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
-
+from keras.layers import LSTM
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -93,8 +93,9 @@ if __name__ == "__main__":
     model = Sequential()
     model.add(Dense(400, activation='relu', input_shape=(460,), kernel_regularizer=regularizers.l2(0.01)))
     model.add(BatchNormalization())
+    model.add(TimeDistributed(Dense(200, activation='relu', kernel_regularizer=regularizers.l2(0.01) )))
     model.add(Dropout(0.3))
-    model.add(Dense(200, activation='relu', kernel_regularizer=regularizers.l2(0.01) ))
+    model.add(Dense(200, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.3))
     model.add(Dense(80, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
     model.add(Dropout(0.3))
