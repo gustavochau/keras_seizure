@@ -18,6 +18,7 @@ import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
+import myEmbedLayer
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -109,41 +110,49 @@ if __name__ == "__main__":
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='sgd')
+
+    model.summary()
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='sgd',
+                  metrics=[metrics.categorical_accuracy])
+    #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
+
+    ## Training
+
+
     lop = 1
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
 
-    X_train, Y_train = data_generator_all_patients(main_folder=main_folder , size_in =size_in, leaveout = lop, istrain=True)
-    print(X_train.shape)
-    print(Y_train.shape)
+    list_all_patients = [1, 3, 12, 15]
+    list_leave = list()
+    list_leave.append(lop)
+    list_patients_training = list(set(list_all_patients) - set(list_leave)) # list of patients over which to train
+
+    for e_num in range(0,epochs):
+        print('========== epoch: ' + str(e_num+1) + '=============')
+        for i in list_patients_training:
+            print(i)
+            X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=i, size_in=size_in)
+            print(X_train.shape)
+            num_positive = sum(Y_train == 1)
+            num_negative = sum(Y_train == 0)
+            # class weight to compensate unbalanced training set
+            class_weight = {0: 1.0,
+                            1: float(num_negative) / float(num_positive)}
+            Y_train = np_utils.to_categorical(Y_train, 2)
+            history = model.fit(X_train, Y_train,
+                                batch_size=batch_size,
+                                epochs=1,
+                                verbose=1, class_weight=class_weight)
+
+
+    ###### Testing
 
     X_test, Y_test = data_generator_all_patients(main_folder=main_folder, size_in=size_in, leaveout=lop, istrain=False)
     print(X_test.shape)
     print(Y_test.shape)
-
-    model.summary()
-
-    num_positive = sum(Y_train==1)
-    num_negative = sum(Y_train==0)
-
-    # class weight to compensate unbalanced training set
-    # labels_dict = {0: float(num_negative),
-    #                 1: float(num_positive)}
-    # class_weight = create_class_weight(labels_dict, mu=0.15)
-    class_weight = {0: 1.0,
-                   1: float(num_negative) / float(num_positive)}
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
-                  metrics=[metrics.categorical_accuracy])
-
-    Y_train=np_utils.to_categorical(Y_train,2)
-    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
-
-    history = model.fit(X_train, Y_train,
-                        batch_size=batch_size,
-                        epochs=epochs,
-                        verbose=1, class_weight=class_weight)
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
