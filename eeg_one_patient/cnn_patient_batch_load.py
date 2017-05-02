@@ -17,6 +17,7 @@ import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
+import pickle
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -33,30 +34,8 @@ def comp_metric(y_true, y_pred):
     tp = sum(np.logical_and(y_true == 1, y_pred == 1))
     tn = sum(np.logical_and(y_true == 0, y_pred == 0))
     sensitivity = 100.0*float(tp) /float((tp + fn))
-    return sensitivity, fp
+    return [sensitivity, fp, fn, tp, tn]
 
-def folder_to_dataset(folder, size_in):
-    list_files = listdir(folder)
-    # print(list_files)
-    num_samples = len(list_files)
-    X = np.zeros(shape=(num_samples, size_in, 23)) #dataset in theano format
-    Y = np.zeros(shape=(num_samples, 1))  # dataset in theano format
-
-    for index, file in enumerate(list_files):
-        # print(folder +'/'+ file)
-        try:
-            mat_var = loadmat(folder + '/' + file)
-        except:
-            print(folder + '/' + file)
-        # X[index,] = np.transpose(mat_var['x'])
-        X[index,:] = (mat_var['x']).reshape(size_in,  23)
-        if ((mat_var['label'] == 0)):
-            Y[index] = 0
-        else:  # ictal
-            Y[index] = 1
-    # Y = np_utils.to_categorical(Y, 2)
-    print(X.shape)
-    return (X, Y)
 
 
 def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
@@ -100,43 +79,45 @@ if __name__ == "__main__":
     np.random.seed(7)
     batch_size = 1000
     num_classes = 2
-    epochs = 50
+    epochs = 30
     size_in = 256
 
     model = Sequential()
-    model.add(Conv1D(nb_filter=30, filter_length=8, input_shape=(size_in,23)))
+    model.add(Conv1D(nb_filter=60, filter_length=10, input_shape=(size_in,23)))
     model.add(Activation('relu'))
     model.add(MaxPooling1D())
-    model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=20, filter_length=5))
+    model.add(Dropout(0.3))
+    model.add(Conv1D(nb_filter=30, filter_length=6))
     model.add(Activation('relu'))
     model.add(MaxPooling1D())
-    model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=10, filter_length=3))
+    model.add(Dropout(0.3))
+    model.add(Conv1D(nb_filter=20, filter_length=4))
     model.add(Activation('relu'))
     model.add(MaxPooling1D())
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.3))
     model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(Dense(100, activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(BatchNormalization(input_shape=(460,)))
+    model.add(Dense(400, activation='relu'))
+    model.add(Dropout(0.3))
+    model.add(Dense(300, activation='relu'))
+    model.add(Dropout(0.3))
+    model.add(Dense(120, activation='relu',))
+    model.add(Dropout(0.3))
     model.add(Dense(50, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(20, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dropout(0.3))
+    model.add(Dense(2, activation='softmax'))
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd')
-    los = 4
-    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
+                  optimizer='rmsprop')
+    los =21
+    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=13, size_in=size_in, leaveout_sample=los,
                                                   isTrain=True)
 
     print(X_train.shape)
     print(Y_train.shape)
 
-    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
+    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=13, size_in=size_in, leaveout_sample=los,
                                                   isTrain=False)
 
     model.summary()
@@ -149,10 +130,10 @@ if __name__ == "__main__":
     #                 1: float(num_positive)}
     # class_weight = create_class_weight(labels_dict, mu=0.15)
     class_weight = {0: 1.0,
-                   1: float(num_negative) / float(num_positive)}
+                   1: 0.8*float(num_negative) / float(num_positive)}
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
+                  optimizer='rmsprop',
                   metrics=[metrics.categorical_accuracy])
 
     Y_train=np_utils.to_categorical(Y_train,2)
@@ -169,17 +150,28 @@ if __name__ == "__main__":
     print('=== Training ====')
     y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
     y_true_t = np.argmax(Y_train, axis=1)
-    sensitivity, fp = comp_metric(y_true_t, y_pred_t)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', fp)
+    metrics_t = comp_metric(y_true_t, y_pred_t)
+    print('Test sensitivity:', metrics_t[0])
+    print('Test # false positives:', metrics_t[1])
 
     print('=== Test ====')
 
     y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
     y_true = np.argmax(Y_test,axis=1)
-    sensitivity, fp = comp_metric(y_true, y_pred)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', fp)
+    metrics_test = comp_metric(y_true, y_pred)
+    print('Test sensitivity:', metrics_test[0])
+    print('Test # false positives:', metrics_test[1])
 
     plt.plot(y_pred)
     plt.plot(y_true)
+
+    variables_save = dict()
+    variables_save['y_pred'] = y_pred
+    variables_save['y_true'] = y_true
+    variables_save['y_pred_t'] = y_pred_t
+    variables_save['y_true_t'] = y_true_t
+    variables_save['metrics_t'] = metrics_t
+    variables_save['metrics_test'] = metrics_test
+
+    with open('objs.pickle', 'w') as f:  # Python 3: open(..., 'wb')
+        pickle.dump(variables_save, f)

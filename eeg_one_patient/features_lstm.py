@@ -77,14 +77,20 @@ def data_generator_one_patient(main_folder, patient_number, leaveout_sample, isT
                 Y = np.concatenate((Y, Y_train))
         #X,Y = balance_dataset(X, Y)
         #Y = np_utils.to_categorical(Y, 2)
-        return X, Y
     else:
         # take only the one for testing
         mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) + '_seg_feats_wav.mat')
         X = mat_var['X']
         Y = mat_var['Y']
         #Y = np_utils.to_categorical(Y, 2)
-        return X, Y
+
+    # stack time samples
+    x1 = (X[0:-3,:]).reshape((-1,1,460))
+    x2 = (X[1:-2,:]).reshape((-1,1,460))
+    x3 = (X[2:-1,:]).reshape((-1,1,460))
+    Y = Y[2:-1,:]
+    X = np.concatenate((x1,x2,x3),axis=1)
+    return X, Y
         # yield X_test, Y_test
 
 
@@ -96,9 +102,9 @@ if __name__ == "__main__":
     epochs = 50
 
     model = Sequential()
-    model.add(Dense(600, activation='relu', input_shape=(460,)))
+    model.add(LSTM(100,input_shape=(3,460), ))
     model.add(BatchNormalization(input_shape=(460,)))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.4))
     model.add(Dense(300, activation='relu', input_shape=(460,)))
     model.add(Dropout(0.2))
     model.add(Dense(120, activation='relu',))
@@ -106,7 +112,6 @@ if __name__ == "__main__":
     model.add(Dense(50, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(2, activation='softmax'))
-
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
@@ -148,16 +153,6 @@ if __name__ == "__main__":
                         epochs=epochs,
                         verbose=1, class_weight=class_weight)
 
-
-
-
-    # for k in range(0,epochs):
-    #     print(k)
-    #     X_sub, Y = balance_dataset(X_train, Y_train)
-    #     Y_sub = np_utils.to_categorical(Y, 2)
-    #     #print(X_sub.shape)
-    #     #print(Y_sub.shape)
-    #     model.train_on_batch(X_sub, Y_sub)
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
