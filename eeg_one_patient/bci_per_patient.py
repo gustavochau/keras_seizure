@@ -4,7 +4,7 @@ from __future__ import print_function
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
-from keras.layers.convolutional import Conv1D, MaxPooling1D
+from keras.layers.convolutional import Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
@@ -17,6 +17,7 @@ import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
+from keras.layers.wrappers import TimeDistributed
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -107,35 +108,31 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 if __name__ == "__main__":
     main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada_ds/'
     np.random.seed(7)
-    batch_size = 1000
-    num_classes = 2
+    batch_size = 300
+    num_classes = 4
     epochs = 15
     size_in = 256
+    # 24   501   100   100
+
+    num_time_samples = 501
+    num_rows = 100
+    num_cols = 100
 
     model = Sequential()
-    model.add(Conv1D(nb_filter=120, filter_length=8, input_shape=(size_in,23)))
+    model.add(TimeDistributed(Conv2D(120, (3, 3)), input_shape=(num_time_samples, num_rows, num_cols)))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    model.add(TimeDistributed(MaxPooling2D()))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=120, filter_length=5))
+    model.add(TimeDistributed(Conv2D(60, (3, 3))))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    model.add(TimeDistributed(MaxPooling2D()))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=120, filter_length=3))
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(LSTM(100))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
-    model.add(LSTM(70))
     model.add(Dropout(0.2))
-    model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(LSTM(200))
-    model.add(Dense(400, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(200, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(80, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(LSTM(50))
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
