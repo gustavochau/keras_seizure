@@ -1,0 +1,8 @@
+*.xml
+*.iml
+*.csv
+*.xlsx
+*.xls
+*.mat
+*.pickle
+.idea/

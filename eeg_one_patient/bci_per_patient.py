@@ -76,37 +76,37 @@ def folder_to_dataset(folder, size_in):
     return (X, Y)
 
 
-def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
+def data_generator_one_patient(main_folder, patient_number,size_in, isTrain=True):
     nb_classes = 2
-    patient_folder = main_folder + 'A' + str(patient_number).zfill(2)
+    if (isTrain):
+        patient_folder = main_folder + 'A' + str(patient_number).zfill(2) +'/train'
+    else:
+        patient_folder = main_folder + 'A' + str(patient_number).zfill(2) +'/test'
     print(patient_folder)
+
     list_samples = listdir(patient_folder)
 
     print(list_samples)
-    if (isTrain):
-        # take all series except for the one for testing
-        X = np.zeros(shape=(0, size_in, 23))
-        Y = np.zeros(shape=(0, 1))
-        for sample in list_samples:
-            # if is not the one to be tested
-            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2))):
-                print(sample)
-                (X_train, Y_train) = folder_to_dataset(patient_folder + '/' + sample,size_in)
-                # yield X_train, Y_train
-                X = np.concatenate((X, X_train))
-                Y = np.concatenate((Y, Y_train))
-        #Y = np_utils.to_categorical(Y, 2)
-        return X, Y
-    else:
-        # take only the one for testing
-        (X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_in)
-        #Y = np_utils.to_categorical(Y, 2)
-        return X, Y
+    X = np.zeros(shape=((0,size_in[1],size_in[2],size_in[3])))
+    Y = np.zeros(shape=(0, 1))
+    for sample in list_samples:
+        # if is not the one to be tested
+
+        print(sample)
+        #(X_train, Y_train) = folder_to_dataset(patient_folder + '/' + sample,size_in)
+        # yield X_train, Y_train
+        mat_var = loadmat(patient_folder + '/' + sample)
+        X_train = (mat_var['samples']).reshape(size_samples)
+        #Y_train = (mat_var['train_labels']).reshape(size_in[0]/2,1)
+        X = np.concatenate((X, X_train))
+        #Y = np.concatenate((Y, Y_train))
+    #Y = np_utils.to_categorical(Y, 2)
+    return X, Y
         # yield X_test, Y_test
 
 
 if __name__ == "__main__":
-    main_folder = '/media/gustavo/TOSHIBA EXT/EEG/Data_segmentada_ds/'
+    main_folder = '/home/gustavo/Documents/MATLAB/BCI/ESI/'
     np.random.seed(7)
     batch_size = 300
     num_classes = 4
@@ -117,79 +117,80 @@ if __name__ == "__main__":
     num_time_samples = 501
     num_rows = 100
     num_cols = 100
+    num_trials = 24
+    size_samples = (num_trials,num_time_samples, num_rows,num_cols)
 
-    model = Sequential()
-    model.add(TimeDistributed(Conv2D(120, (3, 3)), input_shape=(num_time_samples, num_rows, num_cols)))
-    model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling2D()))
-    model.add(Dropout(0.2))
-    model.add(TimeDistributed(Conv2D(60, (3, 3))))
-    model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling2D()))
-    model.add(Dropout(0.2))
-    model.add(TimeDistributed(Flatten()))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(LSTM(100))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.2))
-    model.add(LSTM(50))
-
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd')
-    los = 15
-    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
-                                                  isTrain=True)
+    # model = Sequential()
+    # model.add(TimeDistributed(Conv2D(120, (3, 3)), input_shape=(num_time_samples, num_rows, num_cols)))
+    # model.add(Activation('relu'))
+    # model.add(TimeDistributed(MaxPooling2D()))
+    # model.add(Dropout(0.2))
+    # model.add(TimeDistributed(Conv2D(60, (3, 3))))
+    # model.add(Activation('relu'))
+    # model.add(TimeDistributed(MaxPooling2D()))
+    # model.add(Dropout(0.2))
+    # model.add(TimeDistributed(Flatten()))
+    # model.add(TimeDistributed(BatchNormalization()))
+    # model.add(LSTM(100))
+    # model.add(Activation('relu'))
+    # model.add(Dropout(0.2))
+    # model.add(LSTM(50))
+    #
+    # sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    # model.compile(loss='categorical_crossentropy',
+    #               optimizer='sgd')
+    # los = 15
+    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_samples,isTrain=True)
 
     print(X_train.shape)
     print(Y_train.shape)
 
-    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
-                                                  isTrain=False)
-
-    # scores = model.evaluate_generator(data_generator_mnist(False), val_samples=10000)
-    # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
-    model.summary()
-
-    num_positive = sum(Y_train==1)
-    num_negative = sum(Y_train==0)
-
-    # class weight to compensate unbalanced training set
-    # labels_dict = {0: float(num_negative),
-    #                 1: float(num_positive)}
-    # class_weight = create_class_weight(labels_dict, mu=0.15)
-    class_weight = {0: 1.0,
-                   1: float(num_negative) / float(num_positive)}
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
-                  metrics=[metrics.categorical_accuracy])
-
-    Y_train=np_utils.to_categorical(Y_train,2)
-    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
-
-    history = model.fit(X_train, Y_train,
-                        batch_size=batch_size,
-                        epochs=epochs, validation_split=0.1,
-                        verbose=1, class_weight=class_weight, callbacks=[early_stopping])
-
-    Y_test = np_utils.to_categorical(Y_test,2)
-    score = model.evaluate(X_test, Y_test, verbose=1)
-
-    print('=== Training ====')
-    y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
-    y_true_t = np.argmax(Y_train, axis=1)
-    sensitivity, fp = comp_metric(y_true_t, y_pred_t)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', fp)
-
-    print('=== Test ====')
-
-    y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-    y_true = np.argmax(Y_test,axis=1)
-    sensitivity, fp = comp_metric(y_true, y_pred)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', fp)
-
-    plt.plot(y_pred)
-    plt.plot(y_true)
+    # X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
+    #                                               isTrain=False)
+    #
+    # # scores = model.evaluate_generator(data_generator_mnist(False), val_samples=10000)
+    # # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
+    # model.summary()
+    #
+    # num_positive = sum(Y_train==1)
+    # num_negative = sum(Y_train==0)
+    #
+    # # class weight to compensate unbalanced training set
+    # # labels_dict = {0: float(num_negative),
+    # #                 1: float(num_positive)}
+    # # class_weight = create_class_weight(labels_dict, mu=0.15)
+    # class_weight = {0: 1.0,
+    #                1: float(num_negative) / float(num_positive)}
+    #
+    # model.compile(loss='categorical_crossentropy',
+    #               optimizer='sgd',
+    #               metrics=[metrics.categorical_accuracy])
+    #
+    # Y_train=np_utils.to_categorical(Y_train,2)
+    # early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+    #
+    # history = model.fit(X_train, Y_train,
+    #                     batch_size=batch_size,
+    #                     epochs=epochs, validation_split=0.1,
+    #                     verbose=1, class_weight=class_weight, callbacks=[early_stopping])
+    #
+    # Y_test = np_utils.to_categorical(Y_test,2)
+    # score = model.evaluate(X_test, Y_test, verbose=1)
+    #
+    # print('=== Training ====')
+    # y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
+    # y_true_t = np.argmax(Y_train, axis=1)
+    # sensitivity, fp = comp_metric(y_true_t, y_pred_t)
+    # print('Test sensitivity:', sensitivity)
+    # print('Test # false positives:', fp)
+    #
+    # print('=== Test ====')
+    #
+    # y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
+    # y_true = np.argmax(Y_test,axis=1)
+    # sensitivity, fp = comp_metric(y_true, y_pred)
+    # print('Test sensitivity:', sensitivity)
+    # print('Test # false positives:', fp)
+    #
+    # plt.plot(y_pred)
+    # plt.plot(y_true)
