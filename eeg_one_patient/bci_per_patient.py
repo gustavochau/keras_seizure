@@ -87,7 +87,7 @@ def data_generator_one_patient(main_folder, patient_number,size_in, isTrain=True
     list_samples = listdir(patient_folder)
 
     print(list_samples)
-    X = np.zeros(shape=((0,size_in[1],size_in[2],size_in[3])))
+    X = np.zeros(shape=((0,size_in[1],size_in[2],size_in[3],1)))
     Y = np.zeros(shape=(0, 1))
     for sample in list_samples:
         # if is not the one to be tested
@@ -96,21 +96,21 @@ def data_generator_one_patient(main_folder, patient_number,size_in, isTrain=True
         #(X_train, Y_train) = folder_to_dataset(patient_folder + '/' + sample,size_in)
         # yield X_train, Y_train
         mat_var = loadmat(patient_folder + '/' + sample)
-        X_train = (mat_var['samples']).reshape(size_samples)
-        #Y_train = (mat_var['train_labels']).reshape(size_in[0]/2,1)
+        X_train = (mat_var['samples']).reshape(size_in[0], size_in[1], size_in[2], size_in[3], 1)
+        Y_train = (mat_var['sample_labels']).reshape(size_in[0],1)
         X = np.concatenate((X, X_train))
-        #Y = np.concatenate((Y, Y_train))
+        Y = np.concatenate((Y, Y_train))
     #Y = np_utils.to_categorical(Y, 2)
     return X, Y
         # yield X_test, Y_test
 
 
 if __name__ == "__main__":
-    main_folder = '/home/gustavo/Documents/MATLAB/BCI/ESI/'
+    main_folder = '/home/gustavo/Documents/MATLAB/bci/ESI/'
     np.random.seed(7)
     batch_size = 300
     num_classes = 4
-    epochs = 15
+    epochs = 2
     size_in = 256
     # 24   501   100   100
 
@@ -120,26 +120,29 @@ if __name__ == "__main__":
     num_trials = 24
     size_samples = (num_trials,num_time_samples, num_rows,num_cols)
 
-    # model = Sequential()
-    # model.add(TimeDistributed(Conv2D(120, (3, 3)), input_shape=(num_time_samples, num_rows, num_cols)))
+    model = Sequential()
+    model.add(TimeDistributed(Conv2D(40, (3, 3)), input_shape=(num_time_samples, num_rows, num_cols,1)))
+    model.add(Activation('relu'))
+    model.add(TimeDistributed(MaxPooling2D()))
+    model.add(Dropout(0.2))
+    model.add(TimeDistributed(Conv2D(20, (3, 3))))
+    model.add(Activation('relu'))
+    model.add(TimeDistributed(MaxPooling2D()))
+    model.add(Dropout(0.2))
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(LSTM(40))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.2))
+    # model.add(LSTM(1))
     # model.add(Activation('relu'))
-    # model.add(TimeDistributed(MaxPooling2D()))
     # model.add(Dropout(0.2))
-    # model.add(TimeDistributed(Conv2D(60, (3, 3))))
-    # model.add(Activation('relu'))
-    # model.add(TimeDistributed(MaxPooling2D()))
-    # model.add(Dropout(0.2))
-    # model.add(TimeDistributed(Flatten()))
-    # model.add(TimeDistributed(BatchNormalization()))
-    # model.add(LSTM(100))
-    # model.add(Activation('relu'))
-    # model.add(Dropout(0.2))
-    # model.add(LSTM(50))
-    #
+    model.add(Dense(num_classes, activation='softmax'))
+    model.summary()
+
     # sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    # model.compile(loss='categorical_crossentropy',
-    #               optimizer='sgd')
-    # los = 15
+    model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=[metrics.categorical_accuracy])
+
     X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_samples,isTrain=True)
 
     print(X_train.shape)
@@ -166,16 +169,19 @@ if __name__ == "__main__":
     #               optimizer='sgd',
     #               metrics=[metrics.categorical_accuracy])
     #
-    # Y_train=np_utils.to_categorical(Y_train,2)
+    Y_train=np_utils.to_categorical(Y_train,num_classes)
     # early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
     #
-    # history = model.fit(X_train, Y_train,
-    #                     batch_size=batch_size,
-    #                     epochs=epochs, validation_split=0.1,
-    #                     verbose=1, class_weight=class_weight, callbacks=[early_stopping])
+    history = model.fit(X_train, Y_train,
+                         batch_size=batch_size,
+                         epochs=epochs, validation_split=0.1,
+                         verbose=1)
     #
-    # Y_test = np_utils.to_categorical(Y_test,2)
-    # score = model.evaluate(X_test, Y_test, verbose=1)
+    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_samples,
+                                                  isTrain=False)
+    Y_test = np_utils.to_categorical(Y_test,num_classes)
+    score = model.evaluate(X_test, Y_test, verbose=1)
+    print(score)
     #
     # print('=== Training ====')
     # y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
