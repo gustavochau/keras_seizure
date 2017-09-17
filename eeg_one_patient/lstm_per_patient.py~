@@ -17,6 +17,9 @@ import math
 from keras import metrics
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
+import pickle
+from keras.layers.wrappers import TimeDistributed
+from keras.layers import LSTM
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -33,46 +36,8 @@ def comp_metric(y_true, y_pred):
     tp = sum(np.logical_and(y_true == 1, y_pred == 1))
     tn = sum(np.logical_and(y_true == 0, y_pred == 0))
     sensitivity = 100.0*float(tp) /float((tp + fn))
-    return sensitivity, fp
+    return [sensitivity, fp, fn, tp, tn]
 
-def balance_dataset(X,Y):
-    num_pos = sum(Y == 1)
-    num_neg = sum(Y == 0)
-    X_positive = X[(Y == 1).reshape(X.shape[0]),:]
-    X_negative = X[(Y == 0).reshape(X.shape[0]),:]
-    Y_positive = Y[(Y == 1).reshape(X.shape[0]),:]
-    Y_negative = Y[(Y == 0).reshape(X.shape[0]),:]
-    ran_vec=np.random.randint(low=0, high=num_neg, size=num_pos)
-    X_negative = X_negative[ran_vec,:]
-    Y_negative = Y_negative[ran_vec, :]
-    X = np.concatenate((X_positive,X_negative))
-    Y = np.concatenate((Y_positive, Y_negative))
-    #X_ag = np.concatenate((X,Y),axis=1)
-    #X_sh = np.random.shuffle(X_ag)
-    return X,Y
-
-def folder_to_dataset(folder, size_in):
-    list_files = listdir(folder)
-    # print(list_files)
-    num_samples = len(list_files)
-    X = np.zeros(shape=(num_samples, size_in, 23)) #dataset in theano format
-    Y = np.zeros(shape=(num_samples, 1))  # dataset in theano format
-
-    for index, file in enumerate(list_files):
-        # print(folder +'/'+ file)
-        try:
-            mat_var = loadmat(folder + '/' + file)
-        except:
-            print(folder + '/' + file)
-        # X[index,] = np.transpose(mat_var['x'])
-        X[index,:] = (mat_var['x']).reshape(size_in,  23)
-        if ((mat_var['label'] == 0)):
-            Y[index] = 0
-        else:  # ictal
-            Y[index] = 1
-    # Y = np_utils.to_categorical(Y, 2)
-    print(X.shape)
-    return (X, Y)
 
 
 def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
@@ -83,83 +48,80 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
     print(list_samples)
     if (isTrain):
         # take all series except for the one for testing
-        X = np.zeros(shape=(0, size_in, 23))
+        X = np.zeros(shape=(0, size_in, 23,1))
         Y = np.zeros(shape=(0, 1))
         for sample in list_samples:
             # if is not the one to be tested
-            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2))):
+            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) +'_seg.mat')):
                 print(sample)
-                mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
+
+                mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) +'/'+ sample)
+
                 X_train = mat_var['total_images']
                 Y_train = mat_var['total_labels']
+                X_train = np.reshape(X_train, (X_train.shape[0], size_in, 23, 1))
+
+                #(X_train, Y_train) = folder_to_dataset(patient_folder + '/' + sample,size_in)
+		#print(X_train.shape)
                 # yield X_train, Y_train
-		Y_train[Y_train==2]=0
                 X = np.concatenate((X, X_train))
                 Y = np.concatenate((Y, Y_train))
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
     else:
         # take only the one for testing
-        #(X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_in)
-        mat_var = loadmat(
-        patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
-                2) + '_seg.mat')
-        X = mat_var['total_images']
+        mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2) +'_seg.mat')
+        X =  mat_var['total_images']
         Y = mat_var['total_labels']
-	Y[Y==2]=0
+        X = np.reshape(X, (X.shape[0], size_in, 23, 1))
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
         # yield X_test, Y_test
 
 
 if __name__ == "__main__":
-    #main_folder = '/home/gustavo/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
-    np.random.seed(4869)
-    batch_size = 2000
+    main_folder = '/home/epilepsia/Data_segmentada_ds/'
+#    main_folder = '/home/gustavo/'
+    np.random.seed(7)
+    batch_size = 40
     num_classes = 2
-    epochs = 60
+    epochs = 100
     size_in = 256
-
+    num_channels = 23
+    pat_num = 1 #patient number
     model = Sequential()
-    model.add(Conv1D(nb_filter=120, filter_length=8, input_shape=(size_in,23)))
+    model.add(TimeDistributed(Conv1D(nb_filter=10, filter_length=10), input_shape=(size_in,num_channels,1)))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    model.add(TimeDistributed(MaxPooling1D()))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=60, filter_length=5))
+    model.add(TimeDistributed(Conv1D(nb_filter=10, filter_length=6)))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    #model.add(TimeDistributed(MaxPooling1D()))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=30, filter_length=3))
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(LSTM(30, return_sequences=True))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
     model.add(Dropout(0.2))
-    model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(Dense(400, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(200, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(80, activation='relu'))
+    model.add(LSTM(12))
+    model.add(Activation('relu'))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='softmax'))
+    model.summary()
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='rmsprop')
-    los = 4
-    pat_number = 1;	
-    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=pat_number, size_in=size_in, leaveout_sample=los,
+    los =21
+    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=pat_num, size_in=size_in, leaveout_sample=los,
                                                   isTrain=True)
 
     print(X_train.shape)
     print(Y_train.shape)
 
-    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=pat_number, size_in=size_in, leaveout_sample=los,
+    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=pat_num, size_in=size_in, leaveout_sample=los,
                                                   isTrain=False)
 
-    # scores = model.evaluate_generator(data_generator_mnist(False), val_samples=10000)
-    # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
     model.summary()
 
     num_positive = sum(Y_train==1)
@@ -170,10 +132,10 @@ if __name__ == "__main__":
     #                 1: float(num_positive)}
     # class_weight = create_class_weight(labels_dict, mu=0.15)
     class_weight = {0: 1.0,
-                   1: 0.7*float(num_negative) / float(num_positive)}
+                   1: 1.0} # 0.2*float(num_negative) / float(num_positive)}
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
+                  optimizer='rmsprop',
                   metrics=[metrics.categorical_accuracy])
 
     Y_train=np_utils.to_categorical(Y_train,2)
@@ -181,8 +143,8 @@ if __name__ == "__main__":
 
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
-                        epochs=epochs, #validation_split=0.1,
-                        verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
+                        epochs=epochs,
+                        verbose=1, class_weight=class_weight)
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
@@ -190,17 +152,28 @@ if __name__ == "__main__":
     print('=== Training ====')
     y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
     y_true_t = np.argmax(Y_train, axis=1)
-    sensitivity, fp = comp_metric(y_true_t, y_pred_t)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+    metrics_t = comp_metric(y_true_t, y_pred_t)
+    print('Test sensitivity:', metrics_t[0])
+    print('Test # false positives:', metrics_t[1])
 
     print('=== Test ====')
 
     y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
     y_true = np.argmax(Y_test,axis=1)
-    sensitivity, fp = comp_metric(y_true, y_pred)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+    metrics_test = comp_metric(y_true, y_pred)
+    print('Test sensitivity:', metrics_test[0])
+    print('Test # false positives:', metrics_test[1])
 
     #plt.plot(y_pred)
     #plt.plot(y_true)
+
+    variables_save = dict()
+    variables_save['y_pred'] = y_pred
+    variables_save['y_true'] = y_true
+    variables_save['y_pred_t'] = y_pred_t
+    variables_save['y_true_t'] = y_true_t
+    variables_save['metrics_t'] = metrics_t
+    variables_save['metrics_test'] = metrics_test
+
+    with open('patient.pickle', 'w') as f:  # Python 3: open(..., 'wb')
+        pickle.dump(variables_save, f)

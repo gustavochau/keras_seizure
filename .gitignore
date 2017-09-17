@@ -5,6 +5,9 @@
 *.jpg
 *.xml
 *.iml
+*.pickle
+*.zip
+
 /eeg_one_patient/.idea/workspace.xml
 **/.idea/**/workspace.xml
 

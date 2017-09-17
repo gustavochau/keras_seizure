@@ -93,7 +93,6 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
                 X_train = mat_var['total_images']
                 Y_train = mat_var['total_labels']
                 # yield X_train, Y_train
-		Y_train[Y_train==2]=0
                 X = np.concatenate((X, X_train))
                 Y = np.concatenate((Y, Y_train))
         #Y = np_utils.to_categorical(Y, 2)
@@ -106,7 +105,6 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
                 2) + '_seg.mat')
         X = mat_var['total_images']
         Y = mat_var['total_labels']
-	Y[Y==2]=0
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
         # yield X_test, Y_test
@@ -114,7 +112,7 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 
 if __name__ == "__main__":
     #main_folder = '/home/gustavo/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
+    main_folder = '/home/epilepsia/Data_segmentada_ds/'
     np.random.seed(4869)
     batch_size = 2000
     num_classes = 2
@@ -147,8 +145,8 @@ if __name__ == "__main__":
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='rmsprop')
-    los = 4
-    pat_number = 1;	
+    los = 19
+    pat_number = 2;	
     X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=pat_number, size_in=size_in, leaveout_sample=los,
                                                   isTrain=True)
 
@@ -170,7 +168,7 @@ if __name__ == "__main__":
     #                 1: float(num_positive)}
     # class_weight = create_class_weight(labels_dict, mu=0.15)
     class_weight = {0: 1.0,
-                   1: 0.7*float(num_negative) / float(num_positive)}
+                   1: 0.5*float(num_negative) / float(num_positive)}
 
     model.compile(loss='categorical_crossentropy',
                   optimizer='sgd',
