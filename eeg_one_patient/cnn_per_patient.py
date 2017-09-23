@@ -4,7 +4,7 @@ from __future__ import print_function
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
-from keras.layers.convolutional import Conv1D, MaxPooling1D
+from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
@@ -65,7 +65,7 @@ def folder_to_dataset(folder, size_in):
         except:
             print(folder + '/' + file)
         # X[index,] = np.transpose(mat_var['x'])
-        X[index,:] = (mat_var['x']).reshape(size_in,  23)
+        X[index,:] = (mat_var['x']).reshape(size_in,  23,1)
         if ((mat_var['label'] == 0)):
             Y[index] = 0
         else:  # ictal
@@ -83,7 +83,7 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
     print(list_samples)
     if (isTrain):
         # take all series except for the one for testing
-        X = np.zeros(shape=(0, size_in, 23))
+        X = np.zeros(shape=(0, size_in, 23,1))
         Y = np.zeros(shape=(0, 1))
         for sample in list_samples:
             # if is not the one to be tested
@@ -91,10 +91,12 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
                 print(sample)
                 mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
                 X_train = mat_var['total_images']
+                X_train = X_train.reshape(X_train.shape[0],size_in,  23,1)
                 Y_train = mat_var['total_labels']
                 # yield X_train, Y_train
 		Y_train[Y_train==2]=0
                 X = np.concatenate((X, X_train))
+                X = X.reshape(X.shape[0],size_in,  23,1)
                 Y = np.concatenate((Y, Y_train))
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
@@ -105,6 +107,7 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
         patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
                 2) + '_seg.mat')
         X = mat_var['total_images']
+        X = X.reshape(X.shape[0],size_in,  23,1)
         Y = mat_var['total_labels']
 	Y[Y==2]=0
         #Y = np_utils.to_categorical(Y, 2)
@@ -122,22 +125,24 @@ if __name__ == "__main__":
     size_in = 256
 
     model = Sequential()
-    model.add(Conv1D(nb_filter=120, filter_length=8, input_shape=(size_in,23)))
+    model.add(Conv2D(kernel_size=(40,1),filters=30, input_shape=(size_in,23,1)))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=60, filter_length=5))
+    model.add(Conv2D(kernel_size=(20,1),filters=30, input_shape=(size_in,23,1)))
     model.add(Activation('relu'))
-    model.add(MaxPooling1D())
+    model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.2))
-    model.add(Conv1D(nb_filter=30, filter_length=3))
-    model.add(Activation('relu'))
-    model.add(MaxPooling1D())
-    model.add(LSTM(70))
-    model.add(Dropout(0.2))
+    #model.add(Conv1D(nb_filter=60, filter_length=5))
+    #model.add(Activation('relu'))
+    #model.add(MaxPooling1D())
+    #model.add(Dropout(0.2))
+    #model.add(Conv1D(nb_filter=30, filter_length=3))
+    #model.add(Activation('relu'))
+    #model.add(MaxPooling1D())
+    #model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(BatchNormalization())
-    model.add(LSTM(200))
     model.add(Dense(400, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(200, activation='relu'))
@@ -145,7 +150,7 @@ if __name__ == "__main__":
     model.add(Dense(80, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='softmax'))
-
+    model.summary()
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='rmsprop')
@@ -183,13 +188,9 @@ if __name__ == "__main__":
 
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
-<<<<<<< HEAD
                         epochs=epochs, #validation_split=0.1,
                         verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
-=======
-                        epochs=epochs, validation_split=0.1,
-                        verbose=1, class_weight=class_weight, callbacks=[early_stopping])
->>>>>>> 13f1bbfdd1d4de3e6e6165ee4126f15193fdfdf9
+
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
