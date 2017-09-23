@@ -49,14 +49,14 @@ def data_generator_one_patient(main_folder, patient_number,size_in,balance=False
     print(patient_folder)
     list_samples = listdir(patient_folder)
     print(list_samples)  # take all series except for the one for testing
-    X_pat = np.zeros(shape=(0, size_in, 23,1))
+    X_pat = np.zeros(shape=(0, size_in, 23))
     Y_pat = np.zeros(shape=(0, 1))
     for sample in list_samples:
 #        print(sample)
         mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
         X_train = mat_var['total_images']
         Y_train = mat_var['total_labels']
-        X_train = np.reshape(X_train, (X_train.shape[0], size_in, 23, 1))
+        X_train = np.reshape(X_train, (X_train.shape[0], size_in, 23))
         Y_train[Y_train==2]=0 # relabel pre-seizure segments
         X_pat = np.concatenate((X_pat, X_train))
         Y_pat = np.concatenate((Y_pat, Y_train))
@@ -77,7 +77,7 @@ def data_generator_all_patients(main_folder, size_in, list_all_patients, leaveou
     list_leave.append(leaveout)
     list_patients_training = list(set(list_all_patients) - set(list_leave))
     print(list_patients_training)
-    X = np.zeros(shape=(0, size_in, 23,1))
+    X = np.zeros(shape=(0, size_in, 23))
     Y = np.zeros(shape=(0, 1))
     for i in list_patients_training:
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, patient_number=i, size_in=size_in, balance=True)
@@ -95,17 +95,15 @@ if __name__ == "__main__":
     size_in = 128
     num_channels =23
     model = Sequential()
-    model.add(TimeDistributed(Conv1D(nb_filter=50, filter_length=10), input_shape=(size_in,num_channels,1)))
+    model.add(TimeDistributed(Dense(100), input_shape=(size_in,num_channels)))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling1D()))
     model.add(Dropout(0.2))
-    model.add(TimeDistributed(Conv1D(nb_filter=25, filter_length=6)))
+    model.add(TimeDistributed(Dense(60)))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling1D()))
     model.add(Dropout(0.2))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
-    model.add(LSTM(60, return_sequences=True))
+    model.add(LSTM(50, return_sequences=True))
     model.add(Activation('relu'))
     model.add(Dropout(0.2))
     model.add(LSTM(35, return_sequences = True))
