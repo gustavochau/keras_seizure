@@ -133,9 +133,11 @@ if __name__ == "__main__":
     model.add(Conv1D(nb_filter=30, filter_length=3))
     model.add(Activation('relu'))
     model.add(MaxPooling1D())
+    model.add(LSTM(70))
     model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(BatchNormalization())
+    model.add(LSTM(200))
     model.add(Dense(400, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(200, activation='relu'))
@@ -181,8 +183,13 @@ if __name__ == "__main__":
 
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
+<<<<<<< HEAD
                         epochs=epochs, #validation_split=0.1,
                         verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
+=======
+                        epochs=epochs, validation_split=0.1,
+                        verbose=1, class_weight=class_weight, callbacks=[early_stopping])
+>>>>>>> 13f1bbfdd1d4de3e6e6165ee4126f15193fdfdf9
 
     Y_test = np_utils.to_categorical(Y_test,2)
     score = model.evaluate(X_test, Y_test, verbose=1)
