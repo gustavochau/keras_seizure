@@ -49,14 +49,14 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
     print(patient_folder)
     list_samples = listdir(patient_folder)
     print(list_samples)  # take all series except for the one for testing
-    X_pat = np.zeros(shape=(0, num_per_series, size_in,23))
+    X_pat = np.zeros(shape=(0, num_per_series, size_in,23,1))
     Y_pat = np.zeros(shape=(0, 1))
     for sample in list_samples:
 #        print(sample)
         mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
         X_train = mat_var['total_series']
         Y_train = mat_var['total_labels']
-        X_train = np.reshape(X_train, (X_train.shape[0], num_per_series, size_in,23))
+        X_train = np.reshape(X_train, (X_train.shape[0], num_per_series, size_in,23,1))
         Y_train[Y_train==2]=0 # relabel pre-seizure segments
         X_pat = np.concatenate((X_pat, X_train))
         Y_pat = np.concatenate((Y_pat, Y_train))
@@ -77,7 +77,7 @@ def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_p
     list_leave.append(leaveout)
     list_patients_training = list(set(list_all_patients) - set(list_leave))
     print(list_patients_training)
-    X = np.zeros(shape=(0, num_per_series, size_in, 23))
+    X = np.zeros(shape=(0, num_per_series, size_in, 23,1))
     Y = np.zeros(shape=(0, 1))
     for i in list_patients_training:
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=i, size_in=size_in, balance=True)
@@ -96,13 +96,13 @@ if __name__ == "__main__":
     num_channels =23
     num_per_series = 30
     model = Sequential()
-    model.add(TimeDistributed(Conv1D(nb_filter=50, filter_length=25), input_shape=(num_per_series,size_in,num_channels)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=70), input_shape=(num_per_series,size_in,num_channels,1)))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling1D()))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.2))
-    model.add(TimeDistributed(Conv1D(nb_filter=25, filter_length=12)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30)))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(MaxPooling1D()))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.2))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
