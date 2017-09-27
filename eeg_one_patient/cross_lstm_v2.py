@@ -5,7 +5,7 @@ from __future__ import print_function
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
-from keras.layers.convolutional import Conv1D, MaxPooling1D
+from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
@@ -89,37 +89,42 @@ if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
     main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds30/'
     np.random.seed(7)
-    batch_size = 150
+    batch_size = 20
     num_classes = 2
     epochs = 50
     size_in = 128
     num_channels =23
     num_per_series = 30
     model = Sequential()
-    model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=70), input_shape=(num_per_series,size_in,num_channels,1)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-    model.add(Dropout(0.2))
-    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=12), input_shape=(num_per_series,size_in,num_channels,1)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
-    model.add(LSTM(35, return_sequences=True))
+    model.add(LSTM(20,return_sequences=True))
     model.add(Activation('relu'))
-    model.add(Dropout(0.2))
-    model.add(LSTM(25, return_sequences = True))
+    model.add(Dropout(0.3))
+    model.add(LSTM(10,return_sequences=False))
     model.add(Activation('relu'))
-    model.add(Dropout(0.2))
-    model.add(LSTM(10))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax'))
     model.summary()
 
+#    model.add(LSTM(20, return_sequences=True))
+#    model.add(Activation('relu'))
+#    model.add(Dropout(0.2))
+#    model.add(LSTM(10))
+#    model.add(Activation('relu'))
+#    model.add(Dropout(0.2))
+#    model.add(Dense(num_classes, activation='softmax'))
+#    model.summary()
+
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
                   optimizer='rmsprop')
 
     model.summary()
@@ -149,16 +154,16 @@ if __name__ == "__main__":
     print(num_negative)
 
     class_weight = {0: 1.0,
-                    1: 1.0}
+                    1: 1.0}#float(num_negative)/float(num_positive)}
 
             
     Y_train = np_utils.to_categorical(Y_train, 2)
         #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
-
+    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
     history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
                         epochs=epochs,
-                        verbose=1, class_weight=class_weight)
+                        verbose=1, class_weight=class_weight)#, callbacks=[early_stopping])
 
     ###### Testing
 
