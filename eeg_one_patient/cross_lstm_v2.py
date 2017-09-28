@@ -43,7 +43,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=2):
+def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=3):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     np.random.seed(7)
     batch_size = 20
     num_classes = 2
-    epochs = 50
+    epochs = 35
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -99,9 +99,11 @@ if __name__ == "__main__":
     model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=12), input_shape=(num_per_series,size_in,num_channels,1)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=18)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
+    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=10)))
+    model.add(Activation('relu'))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
