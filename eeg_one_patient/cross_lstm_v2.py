@@ -43,7 +43,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=3):
+def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=4):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -56,11 +56,22 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
         mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
         X_train = mat_var['total_series']
         Y_train = mat_var['total_labels']
+
         X_train = np.reshape(X_train, (X_train.shape[0], num_per_series, size_in,23,1))
-        Y_train[Y_train==2]=0 # relabel pre-seizure segments
+        #Y_train[Y_train==2]=0 # relabel pre-seizure segments
         X_pat = np.concatenate((X_pat, X_train))
         Y_pat = np.concatenate((Y_pat, Y_train))
         # Y = np_utils.to_categorical(Y, 2)
+    print(sum(Y_pat==0))
+    print(sum(Y_pat==1))
+    print(sum(Y_pat==2))
+    #print((Y_pat!=2).flatten())
+    #print((Y_pat!=2).flatten().shape)
+    X_pat = np.compress((Y_pat!=2).flatten(),X_pat,0)
+    Y_pat = np.compress((Y_pat!=2).flatten(),Y_pat,0)
+    print(sum(Y_pat==0))
+    print(sum(Y_pat==1))
+    print(sum(Y_pat==2))
     if balance:
         num_positive = sum(Y_pat==1)
     
@@ -69,7 +80,9 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
         not_selected = list(set(ind_negative) - set(sel_ind_negative)) # which rows to remove
         X_pat = np.delete(X_pat,not_selected,0)
         Y_pat = np.delete(Y_pat,not_selected,0)
-        
+    
+    #X_pat = np.delete(X_pat,np.where(Y_pat==2),0)
+    #Y_pat = np.delete(Y_pat,np.where(Y_pat==2),0)    
     return X_pat, Y_pat
 
 def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_patients, leaveout):
@@ -89,9 +102,9 @@ if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
     main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds30/'
     np.random.seed(7)
-    batch_size = 20
+    batch_size = 30
     num_classes = 2
-    epochs = 35
+    epochs = 30
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -99,18 +112,21 @@ if __name__ == "__main__":
     model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
+    model.add(Dropout(0.3))
     model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=18)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=10)))
+    model.add(Dropout(0.3))
+    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=12)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
-    model.add(LSTM(20,return_sequences=True))
+    model.add(LSTM(25,return_sequences=False))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(LSTM(10,return_sequences=False))
+    #model.add(LSTM(15,return_sequences=False))
+    model.add(Dense(20))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax'))
