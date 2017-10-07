@@ -127,6 +127,10 @@ if __name__ == "__main__":
     model.add(TimeDistributed(Dense(40)))#,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
+    model.add(TimeDistributed(Dense(30)))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+
     model.add(LSTM(25,return_sequences=False))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
