@@ -129,7 +129,7 @@ if __name__ == "__main__":
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(kernel_size=(20,1),filters=30, input_shape=(size_in,23,1)))
+    model.add(Conv2D(kernel_size=(20,1),filters=30))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.2))

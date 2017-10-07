@@ -2,6 +2,7 @@
 '''
 
 from __future__ import print_function
+from keras import regularizers
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
@@ -74,7 +75,7 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
     print(sum(Y_pat==2))
     if balance:
         num_positive = sum(Y_pat==1)
-    
+        #np.random.seed(7)
         ind_negative = np.where(Y_pat==0)[0]
         sel_ind_negative = random.sample(ind_negative, num_positive[0]*bal_ratio)
         not_selected = list(set(ind_negative) - set(sel_ind_negative)) # which rows to remove
@@ -119,9 +120,13 @@ if __name__ == "__main__":
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=12)))
     model.add(Activation('relu'))
+   # model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
+    model.add(Dense(40))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
     model.add(LSTM(25,return_sequences=False))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
