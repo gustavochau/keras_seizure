@@ -3,7 +3,7 @@
 
 from __future__ import print_function
 from keras import regularizers
-
+from keras.layers import Bidirectional
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=12)))
     model.add(Activation('relu'))
-   # model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
 
-    model.add(LSTM(25,return_sequences=False))
+    model.add(Bidirectional(LSTM(25,return_sequences=False)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
     #model.add(LSTM(15,return_sequences=False))
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     print(num_negative)
 
     class_weight = {0: 1.0,
-                    1: 2.0}#float(num_negative)/float(num_positive)}
+                    1: 1.0}#float(num_negative)/float(num_positive)}
 
             
     Y_train = np_utils.to_categorical(Y_train, 2)
