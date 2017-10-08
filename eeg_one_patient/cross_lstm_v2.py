@@ -181,7 +181,7 @@ if __name__ == "__main__":
     print(num_negative)
 
     class_weight = {0: 1.0,
-                    1: 1.0}#float(num_negative)/float(num_positive)}
+                    1: 2.0}#float(num_negative)/float(num_positive)}
 
             
     Y_train = np_utils.to_categorical(Y_train, 2)
