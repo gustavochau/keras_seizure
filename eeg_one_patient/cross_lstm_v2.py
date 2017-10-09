@@ -105,7 +105,7 @@ if __name__ == "__main__":
     np.random.seed(7)
     batch_size = 30
     num_classes = 2
-    epochs = 30
+    epochs = 45
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     print(num_negative)
 
     class_weight = {0: 1.0,
-                    1: 1.0}#float(num_negative)/float(num_positive)}
+                    1: 1.0} #float(num_negative)/float(num_positive)}
 
             
     Y_train = np_utils.to_categorical(Y_train, 2)
