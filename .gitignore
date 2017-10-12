@@ -7,7 +7,7 @@
 *.iml
 *.pickle
 *.zip
-
+*.h5
 /eeg_one_patient/.idea/workspace.xml
 **/.idea/**/workspace.xml
 
