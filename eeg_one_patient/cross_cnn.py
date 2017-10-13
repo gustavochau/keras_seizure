@@ -2,27 +2,35 @@
 '''
 
 from __future__ import print_function
-
+from keras import regularizers
+from keras.layers import Bidirectional
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
-from keras.layers.convolutional import Conv1D, MaxPooling1D
+from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
-<<<<<<< HEAD
 from scipy.io import savemat
-
+from keras.callbacks import ModelCheckpoint
 from keras.utils import np_utils
 from keras import backend as K
 from keras import regularizers
 #import matplotlib.pyplot as plt
 import numpy as np
+np.random.seed(7)
 import math
 import pickle
 from keras import metrics
 from keras.callbacks import EarlyStopping
-#from keras.layers import LSTM
+
+from keras.layers.wrappers import TimeDistributed
+from keras.layers import LSTM
 #import myEmbedLayer
+import random
+random.seed(45) 
+import os
+import tensorflow as tf
+tf.set_random_seed(45)
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -41,7 +49,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=1):
+def data_generator_one_patient(main_folder, patient_number,size_in,balance=False,bal_ratio=1):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -52,7 +60,7 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
     for sample in list_samples:
 #        print(sample)
         mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
-        X_train = mat_var['total_series']
+        X_train = mat_var['total_images']
         Y_train = mat_var['total_labels']
 
         X_train = np.reshape(X_train, (X_train.shape[0], size_in,23,1))
@@ -83,15 +91,15 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
     #Y_pat = np.delete(Y_pat,np.where(Y_pat==2),0)    
     return X_pat, Y_pat
 
-def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_patients, leaveout):
+def data_generator_all_patients(main_folder, size_in, list_all_patients, leaveout):
     list_leave = list()
     list_leave.append(leaveout)
     list_patients_training = list(set(list_all_patients) - set(list_leave))
     print(list_patients_training)
-    X = np.zeros(shape=(0, num_per_series, size_in, 23,1))
+    X = np.zeros(shape=(0, size_in, 23,1))
     Y = np.zeros(shape=(0, 1))
     for i in list_patients_training:
-        X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=i, size_in=size_in, balance=True)
+        X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, patient_number=i, size_in=size_in, balance=True)
         X = np.concatenate((X, X_temp))
         Y = np.concatenate((Y, Y_temp))
         # suffle data
@@ -103,27 +111,28 @@ def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_p
 
 
 if __name__ == "__main__":
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds1/'
+#    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds1/'
+    main_folder = '/home/gchau/data/Data_segmentada_ds1/'
     os.environ['PYTHONHASHSEED'] = '0'
     #session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
     #sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
     #K.set_session(sess)
-    batch_size = 80
+    batch_size = 100
     num_classes = 2
-    epochs = 5
+    epochs = 50
     size_in = 128
     num_channels =23
 
     model = Sequential()
-    model.add(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1))
+    model.add(Conv2D(kernel_size=(30,1),filters=40, input_shape=(size_in,num_channels,1)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(kernel_size=(15,1),filters=18))
+    model.add(Conv2D(kernel_size=(15,1),filters=30))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(kernel_size=(7,1),filters=12))
+    model.add(Conv2D(kernel_size=(7,1),filters=20))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
@@ -158,11 +167,11 @@ if __name__ == "__main__":
 
     ## Training
 
-    lop = 1
+    lop = 12
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
-    #list_all_patients = range(1, 17) + range(18, 24)   
-    list_all_patients = range(1,4)
+    list_all_patients = range(1, 17) + range(18, 24)   
+    #list_all_patients = range(1,4)
     list_leave = list()
     list_leave.append(lop)
     list_patients_training = list(set(list_all_patients) - set(list_leave)) # list of patients over which to train
@@ -170,7 +179,7 @@ if __name__ == "__main__":
     num_positive = 0
     num_negative = 0
     
-    X_train,Y_train = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=lop)
+    X_train,Y_train = data_generator_all_patients(main_folder=main_folder, size_in=size_in, list_all_patients=list_all_patients, leaveout=lop)
 
     num_positive += sum(Y_train == 1)
     num_negative += sum(Y_train == 0)
@@ -187,7 +196,7 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
     ###### Load testing data
-    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
+    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, size_in=size_in)
     print(X_test.shape)
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
@@ -201,7 +210,7 @@ if __name__ == "__main__":
                         shuffle=True,
                         validation_split=0.1,
                         callbacks=[model_checkpoint],
-                        verbose=2, class_weight=class_weight)#, callbacks=[early_stopping])
+                        verbose=0, class_weight=class_weight)#, callbacks=[early_stopping])
         model.load_weights('cv_best_weights.h5')
         score = model.evaluate(X_test, Y_test, verbose=1)
 
@@ -209,8 +218,8 @@ if __name__ == "__main__":
         y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
         y_true_t = np.argmax(Y_train, axis=1)
         metrics_t = comp_metric(y_true_t, y_pred_t)
-        print('Test sensitivity:', metrics_t[0])
-        print('Test false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
+        print('Train sensitivity:', metrics_t[0])
+        print('Train false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
 
         print('=== Test ====')
         y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
