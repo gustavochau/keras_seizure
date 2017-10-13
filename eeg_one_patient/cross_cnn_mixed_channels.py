@@ -5,7 +5,7 @@ from __future__ import print_function
 from keras import regularizers
 from keras.layers import Bidirectional
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
+from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten, Permute
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
@@ -126,6 +126,9 @@ if __name__ == "__main__":
     model = Sequential()
     model.add(Conv2D(kernel_size=(30,1),filters=40, input_shape=(size_in,num_channels,1)))
     model.add(Activation('relu'))
+    model.add(Permute((1, 3, 2)))
+    model.add(TimeDistributed(TimeDistributed(Dense(15))))
+    model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
     model.add(Conv2D(kernel_size=(15,1),filters=30))
@@ -167,7 +170,7 @@ if __name__ == "__main__":
 
     ## Training
 
-    lop = 1
+    lop = 12
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
     list_all_patients = range(1, 17) + range(18, 24)   
