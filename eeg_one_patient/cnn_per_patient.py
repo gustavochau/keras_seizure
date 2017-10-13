@@ -1,31 +1,35 @@
 '''Trains a CNN over the time segments of data
 '''
 from __future__ import print_function
-
+from keras import regularizers
+from keras.layers import Bidirectional
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
+from scipy.io import savemat
+from keras.callbacks import ModelCheckpoint
 from keras.utils import np_utils
 from keras import backend as K
 from keras import regularizers
 #import matplotlib.pyplot as plt
 import numpy as np
+np.random.seed(7)
 import math
+import pickle
 from keras import metrics
 from keras.callbacks import EarlyStopping
-from keras.layers import LSTM
 
-def create_class_weight(labels_dict,mu=0.15):
-    total = np.sum(labels_dict.values())
-    keys = labels_dict.keys()
-    class_weight = dict()
-    for key in keys:
-        score = math.log(mu*total/float(labels_dict[key]))
-        class_weight[key] = score if score > 1.0 else 1.0
-    return class_weight
+from keras.layers.wrappers import TimeDistributed
+from keras.layers import LSTM
+#import myEmbedLayer
+import random
+random.seed(45)
+import os
+import tensorflow as tf
+tf.set_random_seed(45)
 
 def comp_metric(y_true, y_pred):
     fp = sum(np.logical_and(y_true == 0, y_pred == 1))
@@ -51,30 +55,6 @@ def balance_dataset(X,Y):
     #X_sh = np.random.shuffle(X_ag)
     return X,Y
 
-def folder_to_dataset(folder, size_in):
-    list_files = listdir(folder)
-    # print(list_files)
-    num_samples = len(list_files)
-    X = np.zeros(shape=(num_samples, size_in, 23)) #dataset in theano format
-    Y = np.zeros(shape=(num_samples, 1))  # dataset in theano format
-
-    for index, file in enumerate(list_files):
-        # print(folder +'/'+ file)
-        try:
-            mat_var = loadmat(folder + '/' + file)
-        except:
-            print(folder + '/' + file)
-        # X[index,] = np.transpose(mat_var['x'])
-        X[index,:] = (mat_var['x']).reshape(size_in,  23,1)
-        if ((mat_var['label'] == 0)):
-            Y[index] = 0
-        else:  # ictal
-            Y[index] = 1
-    # Y = np_utils.to_categorical(Y, 2)
-    print(X.shape)
-    return (X, Y)
-
-
 def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
@@ -93,12 +73,17 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
                 X_train = mat_var['total_images']
                 X_train = X_train.reshape(X_train.shape[0],size_in,  23,1)
                 Y_train = mat_var['total_labels']
+                X_train = np.compress((Y_train != 2).flatten(), X_train, 0)  # get rid of pre-ictal
+                Y_train = np.compress((Y_train != 2).flatten(), Y_train, 0)  # get rid of pre-ictal
                 # yield X_train, Y_train
-		Y_train[Y_train==2]=0
+
                 X = np.concatenate((X, X_train))
                 X = X.reshape(X.shape[0],size_in,  23,1)
                 Y = np.concatenate((Y, Y_train))
-        #Y = np_utils.to_categorical(Y, 2)
+        # shuffle data
+        permuted_indexes = np.random.permutation(Y.shape[0])
+        X = X[permuted_indexes, :, :, :]
+        Y = Y[permuted_indexes]
         return X, Y
     else:
         # take only the one for testing
@@ -109,7 +94,9 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
         X = mat_var['total_images']
         X = X.reshape(X.shape[0],size_in,  23,1)
         Y = mat_var['total_labels']
-	Y[Y==2]=0
+        X = np.compress((Y != 2).flatten(), X, 0) # get rid of pre-ictal
+        Y = np.compress((Y != 2).flatten(), Y, 0) # get rid of pre-ictal
+        #Y[Y==2]=0
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
         # yield X_test, Y_test
@@ -118,66 +105,57 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 if __name__ == "__main__":
     #main_folder = '/home/gustavo/'
     main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
-    np.random.seed(4869)
-    batch_size = 2000
+    batch_size = 200
     num_classes = 2
-    epochs = 60
+    epochs = 50
     size_in = 256
 
     model = Sequential()
-    model.add(Conv2D(kernel_size=(40,1),filters=30, input_shape=(size_in,23,1)))
+    model.add(Conv2D(kernel_size=(30, 1), filters=40), input_shape=(size_in, num_channels, 1))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2,1)))
-    model.add(Dropout(0.2))
-    model.add(Conv2D(kernel_size=(20,1),filters=30))
+    model.add(MaxPooling2D(pool_size=(2, 1)))
+    model.add(Dropout(0.3))
+    model.add(Conv2D(kernel_size=(15, 1), filters=18))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2,1)))
-    model.add(Dropout(0.2))
-    #model.add(Conv1D(nb_filter=60, filter_length=5))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling1D())
-    #model.add(Dropout(0.2))
-    #model.add(Conv1D(nb_filter=30, filter_length=3))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling1D())
-    #model.add(Dropout(0.2))
+    model.add(MaxPooling2D(pool_size=(2, 1)))
+    model.add(Dropout(0.3))
+    model.add(Conv2D(kernel_size=(7, 1), filters=12))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 1)))
+    model.add(Dropout(0.3))
     model.add(Flatten())
     model.add(BatchNormalization())
-    model.add(Dense(400, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(200, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(80, activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dense(40))  # ,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+    model.add(Dense(30))  # ,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax'))
     model.summary()
+
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer='rmsprop')
+
+
     los = 4
-    pat_number = 1;	
-    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=pat_number, size_in=size_in, leaveout_sample=los,
+    patient_number = 1
+    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
                                                   isTrain=True)
 
     print(X_train.shape)
     print(Y_train.shape)
 
-    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=pat_number, size_in=size_in, leaveout_sample=los,
-                                                  isTrain=False)
+    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
+                                                isTrain=False)
 
-    # scores = model.evaluate_generator(data_generator_mnist(False), val_samples=10000)
-    # print("Baseline Error: %.2f%%" % (100-scores[1]*100))
-    model.summary()
 
     num_positive = sum(Y_train==1)
     num_negative = sum(Y_train==0)
 
-    # class weight to compensate unbalanced training set
-    # labels_dict = {0: float(num_negative),
-    #                 1: float(num_positive)}
-    # class_weight = create_class_weight(labels_dict, mu=0.15)
     class_weight = {0: 1.0,
-                   1: 0.7*float(num_negative) / float(num_positive)}
+                   1: 1.0} #*float(num_negative) / float(num_positive)}
 
     model.compile(loss='categorical_crossentropy',
                   optimizer='sgd',
