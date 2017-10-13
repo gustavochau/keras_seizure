@@ -11,12 +11,13 @@ from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
 from scipy.io import savemat
-
+from keras.callbacks import ModelCheckpoint
 from keras.utils import np_utils
 from keras import backend as K
 from keras import regularizers
 #import matplotlib.pyplot as plt
 import numpy as np
+np.random.seed(7)
 import math
 import pickle
 from keras import metrics
@@ -26,6 +27,10 @@ from keras.layers.wrappers import TimeDistributed
 from keras.layers import LSTM
 #import myEmbedLayer
 import random
+random.seed(45) 
+import os
+import tensorflow as tf
+tf.set_random_seed(45)
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -44,7 +49,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=4):
+def data_generator_one_patient(main_folder, patient_number,num_per_series,size_in,balance=False,bal_ratio=2):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -81,7 +86,7 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series,size_i
         not_selected = list(set(ind_negative) - set(sel_ind_negative)) # which rows to remove
         X_pat = np.delete(X_pat,not_selected,0)
         Y_pat = np.delete(Y_pat,not_selected,0)
-    
+ 
     #X_pat = np.delete(X_pat,np.where(Y_pat==2),0)
     #Y_pat = np.delete(Y_pat,np.where(Y_pat==2),0)    
     return X_pat, Y_pat
@@ -97,15 +102,22 @@ def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_p
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=i, size_in=size_in, balance=True)
         X = np.concatenate((X, X_temp))
         Y = np.concatenate((Y, Y_temp))
+    # shuffle data
+    permuted_indexes = np.random.permutation(Y.shape[0])    
+    X = X[permuted_indexes,:,:,:]
+    Y = Y[permuted_indexes]
     return X,Y
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
     main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds30/'
-    np.random.seed(7)
+    os.environ['PYTHONHASHSEED'] = '0'
+    #session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+    #sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+    #K.set_session(sess)
     batch_size = 30
     num_classes = 2
-    epochs = 45
+    epochs = 40
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -114,11 +126,11 @@ if __name__ == "__main__":
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=18)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=12)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20)))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
@@ -155,6 +167,8 @@ if __name__ == "__main__":
                   optimizer='rmsprop')
 
     model.summary()
+    model.save_weights('initial.h5')
+
     #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
     ## Training
@@ -163,17 +177,17 @@ if __name__ == "__main__":
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
     list_all_patients = range(1, 17) + range(18, 24)   
-    #list_all_patients = range(1,11)
-    list_leave = list()
-    list_leave.append(lop)
-    list_patients_training = list(set(list_all_patients) - set(list_leave)) # list of patients over which to train
+    #list_all_patients = range(1,5)
+    # list_leave = list()
+    # list_leave.append(lop)
+    # list_patients_training = list(set(list_all_patients) - set(list_leave)) # list of patients over which to train
 
 
     num_positive = 0
     num_negative = 0
     
     X_train,Y_train = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=lop)
-
+    print(Y_train)
     num_positive += sum(Y_train == 1)
     num_negative += sum(Y_train == 0)
 
@@ -187,35 +201,43 @@ if __name__ == "__main__":
     Y_train = np_utils.to_categorical(Y_train, 2)
         #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
     early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
-    history = model.fit(X_train, Y_train,
-                        batch_size=batch_size,
-                        epochs=epochs,
-                        verbose=1, class_weight=class_weight)#, callbacks=[early_stopping])
 
-    ###### Testing
-
+    ###### Load testing data
     X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
     print(X_test.shape)
     print(Y_test.shape)
-
     Y_test = np_utils.to_categorical(Y_test,2)
-    score = model.evaluate(X_test, Y_test, verbose=1)
 
-    print('=== Training ====')
-    y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
-    y_true_t = np.argmax(Y_train, axis=1)
-    metrics_t = comp_metric(y_true_t, y_pred_t)
-    print('Test sensitivity:', metrics_t[0])
-    print('Test false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
+    for zz in range(0,5):
+        model_checkpoint = ModelCheckpoint('cv_best_weights.h5', monitor='val_categorical_accuracy', save_best_only=True)
+        model.load_weights('initial.h5') # Reinitialize weights
+        history = model.fit(X_train, Y_train,
+                        batch_size=batch_size,
+                        epochs=epochs,
+                        shuffle=True,
+                        validation_split=0.1,
+                        callbacks=[model_checkpoint],
+                        verbose=2, class_weight=class_weight)#, callbacks=[early_stopping])
+        model.load_weights('cv_best_weights.h5')
+        score = model.evaluate(X_test, Y_test, verbose=1)
 
-    print('=== Test ====')
+        print('=== Training ====')
+        y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
+        y_true_t = np.argmax(Y_train, axis=1)
+        metrics_t = comp_metric(y_true_t, y_pred_t)
+        print('Test sensitivity:', metrics_t[0])
+        print('Test false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
 
-    y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-    y_true = np.argmax(Y_test,axis=1)
-    metrics_test = comp_metric(y_true, y_pred)
-    print('Test sensitivity:', metrics_test[0])
-#    print('Test # false positives:', metrics_test[1])
-    print('Test false positive rate:', float(metrics_test[1])/(float(X_test.shape[0]/30.0)))
+        print('=== Test ====')
+        y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
+        y_true = np.argmax(Y_test,axis=1)
+        metrics_test = comp_metric(y_true, y_pred)
+        print('Test sensitivity:', metrics_test[0])
+    #    print('Test # false positives:', metrics_test[1])
+        print('Test false positive rate:', float(metrics_test[1])/(float(X_test.shape[0]/30.0)))
+        
+
+
     variables_save = dict()
     variables_save['y_pred'] = y_pred
     variables_save['y_true'] = y_true
