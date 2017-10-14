@@ -98,9 +98,10 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
         for sample in list_samples:
             # if is not the one to be tested
             if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2))):
-                print(sample)
+                #print(sample)
                 mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
                 X_train = mat_var['total_images']
+		#print(X_train.shape)
                 X_train = X_train.reshape(X_train.shape[0],size_in,  23,1)
                 Y_train = mat_var['total_labels']
                 X_train = np.compress((Y_train != 2).flatten(), X_train, 0)  # get rid of pre-ictal
@@ -133,11 +134,13 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 
 if __name__ == "__main__":
     #main_folder = '/home/gustavo/'
-    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
-    batch_size = 200
+    main_folder = '/home/gchau/data/Data_segmentada_ds1/'
+
+#    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
+    batch_size = 1000
     num_classes = 2
     epochs = 50
-    size_in = 256
+    size_in = 128
     patient_number = 1
     num_channels = 23
 
