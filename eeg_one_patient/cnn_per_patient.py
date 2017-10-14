@@ -141,7 +141,7 @@ if __name__ == "__main__":
     num_classes = 2
     epochs = 50
     size_in = 128
-    patient_number = 1
+    patient_number = 3
     num_channels = 23
 
     model = Sequential()
@@ -179,7 +179,8 @@ if __name__ == "__main__":
     resumen_train = np.zeros(shape=(len(list_seizures), 2))
     resumen_test = np.zeros(shape=(len(list_seizures), 2))
     for idx,los in enumerate(list_seizures):
-        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los)
+	print('los:' + str(los))
+        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
         model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                            save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
