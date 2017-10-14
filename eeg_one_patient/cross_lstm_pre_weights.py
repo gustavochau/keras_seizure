@@ -121,25 +121,26 @@ if __name__ == "__main__":
     size_in = 128
     num_channels =23
     num_per_series = 30
+    lop = 1
     model = Sequential()
-    model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(30,1),filters=40), input_shape=(num_per_series,size_in,num_channels,1), name = 'conv1'))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30, name = 'conv2')))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20)))
+    model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20, name = 'conv3')))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Dense(40)))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(TimeDistributed(Dense(40, name = 'fc1')))#,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Dense(30)))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(TimeDistributed(Dense(30, name = 'fc2')))#,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
 
@@ -147,36 +148,31 @@ if __name__ == "__main__":
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
     #model.add(LSTM(15,return_sequences=False))
-    model.add(Dense(20))
+    model.add(Dense(20, name = 'fc3'))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
     model.summary()
 
-#    model.add(LSTM(20, return_sequences=True))
-#    model.add(Activation('relu'))
-#    model.add(Dropout(0.2))
-#    model.add(LSTM(10))
-#    model.add(Activation('relu'))
-#    model.add(Dropout(0.2))
-#    model.add(Dense(num_classes, activation='softmax'))
-#    model.summary()
+
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
                   optimizer='rmsprop')
 
     model.summary()
+    nombre_pesos = 'cv_pat' + str(lop) + '_weights.h5'
+    model.load_weights(nombre_pesos, by_name=True)
     model.save_weights('initial.h5')
 
     #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
     ## Training
 
-    lop = 1
+
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
-    list_all_patients = range(1, 17) + range(18, 24)   
+    list_all_patients = range(1, 17) + range(18, 24)
     #list_all_patients = range(1,5)
     # list_leave = list()
     # list_leave.append(lop)
@@ -185,7 +181,7 @@ if __name__ == "__main__":
 
     num_positive = 0
     num_negative = 0
-    
+
     X_train,Y_train = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=lop)
     print(Y_train)
     num_positive += sum(Y_train == 1)
@@ -197,7 +193,7 @@ if __name__ == "__main__":
     class_weight = {0: 1.0,
                     1: 1.0} #float(num_negative)/float(num_positive)}
 
-            
+
     Y_train = np_utils.to_categorical(Y_train, 2)
         #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
     early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
@@ -208,34 +204,51 @@ if __name__ == "__main__":
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
 
-    for zz in range(0,5):
-        model_checkpoint = ModelCheckpoint('cv_best_weights.h5', monitor='val_categorical_accuracy', save_best_only=True)
-        model.load_weights('initial.h5') # Reinitialize weights
+    num_realizations = 5
+    resumen_train = np.zeros(shape=(num_realizations,2))
+    resumen_test = np.zeros(shape=(num_realizations,2))
+
+    for zz in range(0, num_realizations):
+        nombre_pesos = 'cv_pat' + str(lop) + '_weights.h5'
+        model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
+        model.load_weights('initial.h5')  # Reinitialize weights
         history = model.fit(X_train, Y_train,
-                        batch_size=batch_size,
-                        epochs=epochs,
-                        shuffle=True,
-                        validation_split=0.1,
-                        callbacks=[model_checkpoint],
-                        verbose=2, class_weight=class_weight)#, callbacks=[early_stopping])
-        model.load_weights('cv_best_weights.h5')
+                            batch_size=batch_size,
+                            epochs=epochs,
+                            shuffle=True,
+                            validation_split=0.1,
+                            callbacks=[model_checkpoint],
+                            verbose=0, class_weight=class_weight)  # , callbacks=[early_stopping])
+        model.load_weights(nombre_pesos)
         score = model.evaluate(X_test, Y_test, verbose=1)
 
         print('=== Training ====')
         y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
         y_true_t = np.argmax(Y_train, axis=1)
         metrics_t = comp_metric(y_true_t, y_pred_t)
-        print('Test sensitivity:', metrics_t[0])
-        print('Test false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
+        print('Train sensitivity:', metrics_t[0])
+        print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0])*30.0 / 3600.0))
+
+        resumen_train[zz, 0] = metrics_t[0]
+        resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0])*30.0 / 3600.0)
 
         print('=== Test ====')
-        y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-        y_true = np.argmax(Y_test,axis=1)
+        y_pred = np.argmax(model.predict(X_test, verbose=0), axis=1)
+        y_true = np.argmax(Y_test, axis=1)
         metrics_test = comp_metric(y_true, y_pred)
         print('Test sensitivity:', metrics_test[0])
-    #    print('Test # false positives:', metrics_test[1])
-        print('Test false positive rate:', float(metrics_test[1])/(float(X_test.shape[0]/30.0)))
-        
+        #    print('Test # false positives:', metrics_test[1])
+        print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0])*30.0 / 3600.0))
+
+        resumen_test[zz, 0] = metrics_test[0]
+        resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0])*30.0 / 3600.0)
+
+    promedio_train = np.average(resumen_train, axis=0)
+    promedio_test = np.average(resumen_test, axis=0)
+
+    print('===total===')
+    print('train: ' + str(promedio_train[0]) + '  ' + str(promedio_train[1]))
+    print('test: ' + str(promedio_test[0]) + '  ' + str(promedio_test[1]))
 
 
     variables_save = dict()
