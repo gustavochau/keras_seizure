@@ -140,7 +140,6 @@ if __name__ == "__main__":
     # model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
-<<<<<<< HEAD
     model.add(Conv2D(kernel_size=(7,1),filters=20,name='conv3'))
     model.add(Activation('relu'))
     # model.add(Permute((1, 3, 2)))
@@ -148,12 +147,10 @@ if __name__ == "__main__":
     # model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
-=======
     #model.add(Conv2D(kernel_size=(7,1),filters=20))
     #model.add(Activation('relu'))
     #model.add(MaxPooling2D(pool_size=(2,1)))
     #model.add(Dropout(0.3))
->>>>>>> e88703b2e56111c01d2c77d40fc3fadd515faf41
     model.add(Flatten())
     model.add(BatchNormalization())
     model.add(Dense(30))#,kernel_regularizer=regularizers.l1(0.01)))
@@ -242,10 +239,10 @@ if __name__ == "__main__":
         y_true_t = np.argmax(Y_train, axis=1)
         metrics_t = comp_metric(y_true_t, y_pred_t)
         print('Train sensitivity:', metrics_t[0])
-        print('Train false positive rate:', float(metrics_t[1])/(float(num_negative+num_positive)/30.0))
+        print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0])*1.0 / 3600.0))
 
-        resumen_train[zz,0] = metrics_t[0]
-        resumen_train[zz,1] = metrics_t[1]
+        resumen_train[zz, 0] = metrics_t[0]
+        resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0])*1.0 / 3600.0)
 
         print('=== Test ====')
         y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
@@ -253,10 +250,10 @@ if __name__ == "__main__":
         metrics_test = comp_metric(y_true, y_pred)
         print('Test sensitivity:', metrics_test[0])
     #    print('Test # false positives:', metrics_test[1])
-        print('Test false positive rate:', float(metrics_test[1])/(float(X_test.shape[0]/30.0)))
+        print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0])*1.0 / 3600.0))
 
-        resumen_test[zz,0] = metrics_test[0]
-        resumen_test[zz,1] = float(metrics_test[1])/(float(X_test.shape[0]/30.0))
+        resumen_test[zz, 0] = metrics_test[0]
+        resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0])*1.0 / 3600.0)
     
     promedio_train = np.average(resumen_train,axis=0)    
     promedio_test = np.average(resumen_test,axis=0)    
