@@ -133,7 +133,7 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 
 if __name__ == "__main__":
     #main_folder = '/home/gustavo/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
+    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
     batch_size = 200
     num_classes = 2
     epochs = 50
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     num_channels = 23
 
     model = Sequential()
-    model.add(Conv2D(kernel_size=(30, 1), filters=40), input_shape=(size_in, num_channels, 1))
+    model.add(Conv2D(kernel_size=(30, 1), filters=40, input_shape=(size_in, num_channels, 1)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 1)))
     model.add(Dropout(0.3))
@@ -172,7 +172,10 @@ if __name__ == "__main__":
 
     model.save_weights('initial.h5') # initial weights for all cv
 
-    for los in list_seizures_patient(patient_number):
+    list_seizures = list_seizures_patient(patient_number)
+    resumen_train = np.zeros(shape=(len(list_seizures), 2))
+    resumen_test = np.zeros(shape=(len(list_seizures), 2))
+    for idx,los in enumerate(list_seizures):
         name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los)
         model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                            save_best_only=True)
@@ -193,16 +196,15 @@ if __name__ == "__main__":
         class_weight = {0: 1.0,
                        1: 1.0} #*float(num_negative) / float(num_positive)}
 
-
-
         Y_train=np_utils.to_categorical(Y_train,2)
-        early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
         history = model.fit(X_train, Y_train,
                             batch_size=batch_size,
-                            epochs=epochs, #validation_split=0.1,
-                            verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
-
+                            epochs=epochs,
+                            shuffle=True,
+                            validation_split=0.1,
+                            callbacks=[model_checkpoint],
+                            verbose=1, class_weight=class_weight)  # , callbacks=[early_stopping])
 
         Y_test = np_utils.to_categorical(Y_test,2)
         score = model.evaluate(X_test, Y_test, verbose=1)
@@ -212,7 +214,10 @@ if __name__ == "__main__":
         y_true_t = np.argmax(Y_train, axis=1)
         sensitivity, fp = comp_metric(y_true_t, y_pred_t)
         print('Test sensitivity:', sensitivity)
-        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+        print('Test # false positives:', float(fp)/(float(X_train.shape[0]/30.0)))
+
+        resumen_train[idx, 0] = sensitivity
+        resumen_train[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
 
         print('=== Test ====')
 
@@ -221,6 +226,16 @@ if __name__ == "__main__":
         sensitivity, fp = comp_metric(y_true, y_pred)
         print('Test sensitivity:', sensitivity)
         print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+
+        resumen_test[idx, 0] = sensitivity
+        resumen_test[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
+
+    promedio_train = np.average(resumen_train, axis=0)
+    promedio_test = np.average(resumen_test, axis=0)
+
+    print('===total===')
+    print('train: ' + str(promedio_train[0]) + '  ' + str(promedio_train[1]))
+    print('test: ' + str(promedio_test[0]) + '  ' + str(promedio_test[1]))
 
     #plt.plot(y_pred)
     #plt.plot(y_true)
