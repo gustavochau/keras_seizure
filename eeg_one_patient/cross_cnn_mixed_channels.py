@@ -140,6 +140,7 @@ if __name__ == "__main__":
     # model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
+<<<<<<< HEAD
     model.add(Conv2D(kernel_size=(7,1),filters=20,name='conv3'))
     model.add(Activation('relu'))
     # model.add(Permute((1, 3, 2)))
@@ -147,12 +148,18 @@ if __name__ == "__main__":
     # model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
+=======
+    #model.add(Conv2D(kernel_size=(7,1),filters=20))
+    #model.add(Activation('relu'))
+    #model.add(MaxPooling2D(pool_size=(2,1)))
+    #model.add(Dropout(0.3))
+>>>>>>> e88703b2e56111c01d2c77d40fc3fadd515faf41
     model.add(Flatten())
     model.add(BatchNormalization())
-    model.add(Dense(40))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Dense(30))#,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(Dense(30))#,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Dense(15))#,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
     model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax'))
