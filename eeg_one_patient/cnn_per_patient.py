@@ -55,6 +55,36 @@ def balance_dataset(X,Y):
     #X_sh = np.random.shuffle(X_ag)
     return X,Y
 
+
+def list_seizures_patient(patient_number):
+    list_seizures = []
+    for i in range(23):
+        list_seizures.append([])
+    list_seizures[0] = [3, 4, 15, 16, 18, 21, 26]
+    list_seizures[1] = [16, 19]
+    list_seizures[2] = [1, 2, 3, 4, 34, 35, 36]
+    list_seizures[3] = [5, 8, 28]
+    list_seizures[4] = [6, 13, 16, 17, 22]
+    list_seizures[5] = [1, 4, 9, 10, 13, 18, 24]
+    list_seizures[6] = [12, 13, 19]
+    list_seizures[7] = [2, 5, 11, 13, 21]
+    list_seizures[8] = [6, 8, 19]
+    list_seizures[9] = [12, 20, 27, 30, 31, 38, 89]
+    list_seizures[10] = [82, 92, 99]
+    list_seizures[11] = [6, 8, 9, 10, 11, 23, 33, 36, 38, 42]
+    list_seizures[12] = [19, 21, 55, 58, 59, 60, 62]
+    list_seizures[13] = [3, 4, 6, 11, 17, 18, 27]
+    list_seizures[14] = [6, 10, 15, 17, 20, 22, 28, 31, 40, 46, 49, 52, 54, 62]
+    list_seizures[15] = [10, 11, 14, 16, 17]
+    list_seizures[17] = [29, 30, 31, 32, 35, 36]
+    list_seizures[18] = [28, 29, 30]
+    list_seizures[19] = [12, 13, 14, 15, 16, 68]
+    list_seizures[20] = [19, 20, 21, 22]
+    list_seizures[21] = [20, 25, 38]
+    list_seizures[22] = [6, 8, 9]
+    return list_seizures[patient_number-1]
+
+
 def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
@@ -87,9 +117,8 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
         return X, Y
     else:
         # take only the one for testing
-        #(X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_in)
-        mat_var = loadmat(
-        patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
+        # (X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_in)
+        mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
                 2) + '_seg.mat')
         X = mat_var['total_images']
         X = X.reshape(X.shape[0],size_in,  23,1)
@@ -109,6 +138,8 @@ if __name__ == "__main__":
     num_classes = 2
     epochs = 50
     size_in = 256
+    patient_number = 1
+    num_channels = 23
 
     model = Sequential()
     model.add(Conv2D(kernel_size=(30, 1), filters=40), input_shape=(size_in, num_channels, 1))
@@ -133,60 +164,63 @@ if __name__ == "__main__":
     model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax'))
     model.summary()
-
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
-                  optimizer='rmsprop')
-
-
-    los = 4
-    patient_number = 1
-    X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
-                                                  isTrain=True)
-
-    print(X_train.shape)
-    print(Y_train.shape)
-
-    X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
-                                                isTrain=False)
-
-
-    num_positive = sum(Y_train==1)
-    num_negative = sum(Y_train==0)
-
-    class_weight = {0: 1.0,
-                   1: 1.0} #*float(num_negative) / float(num_positive)}
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
+                  optimizer='rmsprop',
                   metrics=[metrics.categorical_accuracy])
 
-    Y_train=np_utils.to_categorical(Y_train,2)
-    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
-    history = model.fit(X_train, Y_train,
-                        batch_size=batch_size,
-                        epochs=epochs, #validation_split=0.1,
-                        verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
+    model.save_weights('initial.h5') # initial weights for all cv
+
+    for los in list_seizures_patient(patient_number):
+        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los)
+        model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
+                                           save_best_only=True)
+        model.load_weights('initial.h5')  # Reinitialize weights
+        X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
+                                                      isTrain=True)
+
+        print(X_train.shape)
+        print(Y_train.shape)
+
+        X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
+                                                    isTrain=False)
 
 
-    Y_test = np_utils.to_categorical(Y_test,2)
-    score = model.evaluate(X_test, Y_test, verbose=1)
+        num_positive = sum(Y_train==1)
+        num_negative = sum(Y_train==0)
 
-    print('=== Training ====')
-    y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
-    y_true_t = np.argmax(Y_train, axis=1)
-    sensitivity, fp = comp_metric(y_true_t, y_pred_t)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+        class_weight = {0: 1.0,
+                       1: 1.0} #*float(num_negative) / float(num_positive)}
 
-    print('=== Test ====')
 
-    y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-    y_true = np.argmax(Y_test,axis=1)
-    sensitivity, fp = comp_metric(y_true, y_pred)
-    print('Test sensitivity:', sensitivity)
-    print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+
+        Y_train=np_utils.to_categorical(Y_train,2)
+        early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
+        history = model.fit(X_train, Y_train,
+                            batch_size=batch_size,
+                            epochs=epochs, #validation_split=0.1,
+                            verbose=1, class_weight=class_weight) #, callbacks=[early_stopping])
+
+
+        Y_test = np_utils.to_categorical(Y_test,2)
+        score = model.evaluate(X_test, Y_test, verbose=1)
+
+        print('=== Training ====')
+        y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
+        y_true_t = np.argmax(Y_train, axis=1)
+        sensitivity, fp = comp_metric(y_true_t, y_pred_t)
+        print('Test sensitivity:', sensitivity)
+        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+
+        print('=== Test ====')
+
+        y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
+        y_true = np.argmax(Y_test,axis=1)
+        sensitivity, fp = comp_metric(y_true, y_pred)
+        print('Test sensitivity:', sensitivity)
+        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
 
     #plt.plot(y_pred)
     #plt.plot(y_true)
