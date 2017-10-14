@@ -141,7 +141,7 @@ if __name__ == "__main__":
     num_classes = 2
     epochs = 50
     size_in = 128
-    patient_number = 3
+    patient_number = 4
     num_channels = 23
 
     model = Sequential()
@@ -218,10 +218,10 @@ if __name__ == "__main__":
         y_true_t = np.argmax(Y_train, axis=1)
         sensitivity, fp = comp_metric(y_true_t, y_pred_t)
         print('Test sensitivity:', sensitivity)
-        print('Test # false positives:', float(fp)/(float(X_train.shape[0]/30.0)))
+        print('Test # false positives:', float(fp)/(float(X_train.shape[0]/3600.0)))
 
         resumen_train[idx, 0] = sensitivity
-        resumen_train[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
+        resumen_train[idx, 1] = float(fp)/(float(X_test.shape[0]/3600.0))
 
         print('=== Test ====')
 
@@ -229,10 +229,10 @@ if __name__ == "__main__":
         y_true = np.argmax(Y_test,axis=1)
         sensitivity, fp = comp_metric(y_true, y_pred)
         print('Test sensitivity:', sensitivity)
-        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/3600.0)))
 
         resumen_test[idx, 0] = sensitivity
-        resumen_test[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
+        resumen_test[idx, 1] = float(fp)/(float(X_test.shape[0]/3600.0))
 
     promedio_train = np.average(resumen_train, axis=0)
     promedio_test = np.average(resumen_test, axis=0)
