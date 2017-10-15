@@ -141,7 +141,7 @@ if __name__ == "__main__":
     num_classes = 2
     epochs = 50
     size_in = 128
-    patient_number = 1
+    patient_number = 4
     num_channels = 23
 
     model = Sequential()
@@ -179,7 +179,8 @@ if __name__ == "__main__":
     resumen_train = np.zeros(shape=(len(list_seizures), 2))
     resumen_test = np.zeros(shape=(len(list_seizures), 2))
     for idx,los in enumerate(list_seizures):
-        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los)
+	print('los:' + str(los))
+        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
         model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                            save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
@@ -217,10 +218,10 @@ if __name__ == "__main__":
         y_true_t = np.argmax(Y_train, axis=1)
         sensitivity, fp = comp_metric(y_true_t, y_pred_t)
         print('Test sensitivity:', sensitivity)
-        print('Test # false positives:', float(fp)/(float(X_train.shape[0]/30.0)))
+        print('Test # false positives:', float(fp)/(float(X_train.shape[0]/3600.0)))
 
         resumen_train[idx, 0] = sensitivity
-        resumen_train[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
+        resumen_train[idx, 1] = float(fp)/(float(X_test.shape[0]/3600.0))
 
         print('=== Test ====')
 
@@ -228,10 +229,10 @@ if __name__ == "__main__":
         y_true = np.argmax(Y_test,axis=1)
         sensitivity, fp = comp_metric(y_true, y_pred)
         print('Test sensitivity:', sensitivity)
-        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/30.0)))
+        print('Test # false positives:', float(fp)/(float(X_test.shape[0]/3600.0)))
 
         resumen_test[idx, 0] = sensitivity
-        resumen_test[idx, 1] = float(fp)/(float(X_test.shape[0]/30.0))
+        resumen_test[idx, 1] = float(fp)/(float(X_test.shape[0]/3600.0))
 
     promedio_train = np.average(resumen_train, axis=0)
     promedio_test = np.average(resumen_test, axis=0)
