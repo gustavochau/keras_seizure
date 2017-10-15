@@ -128,9 +128,9 @@ if __name__ == "__main__":
     model = Sequential()
     model.add(Conv2D(kernel_size=(30,1),filters=40, input_shape=(size_in,num_channels,1),name='conv1'))
     model.add(Activation('relu'))
-    # model.add(Permute((1, 3, 2)))
-    # model.add(TimeDistributed(TimeDistributed(Dense(15))))
-    # model.add(Permute((1, 3, 2)))
+    model.add(Permute((1, 3, 2)))
+    model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.01)))))
+    model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
     model.add(Conv2D(kernel_size=(15,1),filters=30,name='conv2'))
@@ -147,10 +147,6 @@ if __name__ == "__main__":
     # model.add(Permute((1, 3, 2)))
     model.add(MaxPooling2D(pool_size=(2,1)))
     model.add(Dropout(0.3))
-    #model.add(Conv2D(kernel_size=(7,1),filters=20))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling2D(pool_size=(2,1)))
-    #model.add(Dropout(0.3))
     model.add(Flatten())
     model.add(BatchNormalization())
     model.add(Dense(30))#,kernel_regularizer=regularizers.l1(0.01)))
@@ -216,12 +212,12 @@ if __name__ == "__main__":
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
 
-    num_realizations = 1
+    num_realizations = 3
     resumen_train = np.zeros(shape=(num_realizations,2))
     resumen_test = np.zeros(shape=(num_realizations,2))
 
     for zz in range(0,num_realizations):
-        nombre_pesos = 'cv_pat' + str(lop) + '_weights.h5'
+        nombre_pesos = 'sparse_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5') # Reinitialize weights
         history = model.fit(X_train, Y_train,
@@ -239,21 +235,21 @@ if __name__ == "__main__":
         y_true_t = np.argmax(Y_train, axis=1)
         metrics_t = comp_metric(y_true_t, y_pred_t)
         print('Train sensitivity:', metrics_t[0])
-        print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0])*1.0 / 3600.0))
+        print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0])*30.0 / 3600.0))
 
         resumen_train[zz, 0] = metrics_t[0]
-        resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0])*1.0 / 3600.0)
+        resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0])*30.0 / 3600.0)
 
         print('=== Test ====')
-        y_pred = np.argmax(model.predict(X_test, verbose=0),axis=1)
-        y_true = np.argmax(Y_test,axis=1)
+        y_pred = np.argmax(model.predict(X_test, verbose=0), axis=1)
+        y_true = np.argmax(Y_test, axis=1)
         metrics_test = comp_metric(y_true, y_pred)
         print('Test sensitivity:', metrics_test[0])
-    #    print('Test # false positives:', metrics_test[1])
-        print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0])*1.0 / 3600.0))
+        #    print('Test # false positives:', metrics_test[1])
+        print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0])*30.0 / 3600.0))
 
         resumen_test[zz, 0] = metrics_test[0]
-        resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0])*1.0 / 3600.0)
+        resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0])*30.0 / 3600.0)
     
     promedio_train = np.average(resumen_train,axis=0)    
     promedio_test = np.average(resumen_test,axis=0)    
