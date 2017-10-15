@@ -127,6 +127,9 @@ if __name__ == "__main__":
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
     model.add(Dropout(0.3))
+    #model.add(Permute((1, 3, 2)))
+    # model.add(TimeDistributed(TimeDistributed(Dense(15))))
+    # model.add(Permute((1, 3, 2)))
     model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30, name = 'conv2')))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
@@ -209,7 +212,7 @@ if __name__ == "__main__":
     resumen_test = np.zeros(shape=(num_realizations,2))
 
     for zz in range(0, num_realizations):
-        nombre_pesos = 'cv_pat' + str(lop) + '_weights.h5'
+        nombre_pesos_pre = 'pre_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
         history = model.fit(X_train, Y_train,
@@ -219,7 +222,7 @@ if __name__ == "__main__":
                             validation_split=0.1,
                             callbacks=[model_checkpoint],
                             verbose=0, class_weight=class_weight)  # , callbacks=[early_stopping])
-        model.load_weights(nombre_pesos)
+        model.load_weights(nombre_pesos_pre)
         score = model.evaluate(X_test, Y_test, verbose=1)
 
         print('=== Training ====')
