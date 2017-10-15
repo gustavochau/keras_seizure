@@ -85,7 +85,7 @@ def list_seizures_patient(patient_number):
     return list_seizures[patient_number-1]
 
 
-def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sample, isTrain=True):
+def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_sample, isTrain=True, balance=False,bal_ratio=1):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -93,24 +93,32 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
     print(list_samples)
     if (isTrain):
         # take all series except for the one for testing
-        X = np.zeros(shape=(0, size_in, 23,1))
+        X = np.zeros(shape=(0, size_img, size_img, 3))
         Y = np.zeros(shape=(0, 1))
         for sample in list_samples:
             # if is not the one to be tested
             if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2))):
                 #print(sample)
                 mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
-                X_train = mat_var['total_images']
+                X_train = mat_var['proj_images']
 		#print(X_train.shape)
-                X_train = X_train.reshape(X_train.shape[0],size_in,  23,1)
+                X_train = X_train.reshape(X_train.shape[0], size_img, size_img, 3)
                 Y_train = mat_var['total_labels']
                 X_train = np.compress((Y_train != 2).flatten(), X_train, 0)  # get rid of pre-ictal
                 Y_train = np.compress((Y_train != 2).flatten(), Y_train, 0)  # get rid of pre-ictal
                 # yield X_train, Y_train
 
                 X = np.concatenate((X, X_train))
-                X = X.reshape(X.shape[0],size_in,  23,1)
                 Y = np.concatenate((Y, Y_train))
+
+        if balance:
+            num_positive = sum(Y == 1)
+            ind_negative = np.where(Y == 0)[0]
+            sel_ind_negative = random.sample(ind_negative, num_positive[0] * bal_ratio)
+            not_selected = list(set(ind_negative) - set(sel_ind_negative))  # which rows to remove
+            X = np.delete(X, not_selected, 0)
+            Y = np.delete(Y, not_selected, 0)
+
         # shuffle data
         permuted_indexes = np.random.permutation(Y.shape[0])
         X = X[permuted_indexes, :, :, :]
@@ -118,14 +126,14 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
         return X, Y
     else:
         # take only the one for testing
-        # (X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_in)
+        # (X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_img)
         mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
                 2) + '_seg.mat')
-        X = mat_var['total_images']
-        X = X.reshape(X.shape[0],size_in,  23,1)
+        X = mat_var['proj_images']
+        X = X.reshape(X.shape[0], size_img, size_img, 3)
         Y = mat_var['total_labels']
-        X = np.compress((Y != 2).flatten(), X, 0) # get rid of pre-ictal
-        Y = np.compress((Y != 2).flatten(), Y, 0) # get rid of pre-ictal
+        X = np.compress((Y != 2).flatten(), X, axis=0) # get rid of pre-ictal
+        Y = np.compress((Y != 2).flatten(), Y, axis=0) # get rid of pre-ictal
         #Y[Y==2]=0
         #Y = np_utils.to_categorical(Y, 2)
         return X, Y
@@ -133,29 +141,32 @@ def data_generator_one_patient(main_folder, patient_number,size_in, leaveout_sam
 
 
 if __name__ == "__main__":
-    #main_folder = '/home/gustavo/'
-    main_folder = '/home/gchau/data/Data_segmentada_ds1/'
+    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/proj_images_ds1/'
+    #main_folder = '/home/gchau/data/Data_segmentada_ds1/'
 
 #    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
-    batch_size = 1000
+    batch_size = 200
     num_classes = 2
     epochs = 50
-    size_in = 128
-    patient_number = 4
-    num_channels = 23
+    size_img = 16
+    patient_number = 1
 
     model = Sequential()
-    model.add(Conv2D(kernel_size=(30, 1), filters=40, input_shape=(size_in, num_channels, 1)))
+    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding = 'valid', input_shape=(size_img, size_img, 3)))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 1)))
+    model.add(BatchNormalization())
+    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3)))
+    model.add(Activation('relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(kernel_size=(15, 1), filters=18))
+    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding = 'valid'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 1)))
-    model.add(Dropout(0.3))
-    model.add(Conv2D(kernel_size=(7, 1), filters=12))
+    model.add(BatchNormalization())
+    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding = 'valid'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 1)))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.3))
     model.add(Flatten())
     model.add(BatchNormalization())
@@ -180,17 +191,17 @@ if __name__ == "__main__":
     resumen_test = np.zeros(shape=(len(list_seizures), 2))
     for idx,los in enumerate(list_seizures):
 	print('los:' + str(los))
-        name_save_weights = 'weights_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
+        name_save_weights = '2d_weights_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
         model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                            save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
-        X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
-                                                      isTrain=True)
+        X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los,
+                                                      isTrain=True, balance=True,bal_ratio=4)
 
         print(X_train.shape)
         print(Y_train.shape)
 
-        X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_in=size_in, leaveout_sample=los,
+        X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los,
                                                     isTrain=False)
 
 
@@ -208,7 +219,7 @@ if __name__ == "__main__":
                             shuffle=True,
                             validation_split=0.1,
                             callbacks=[model_checkpoint],
-                            verbose=1, class_weight=class_weight)  # , callbacks=[early_stopping])
+                            verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
 
         Y_test = np_utils.to_categorical(Y_test,2)
         score = model.evaluate(X_test, Y_test, verbose=1)
