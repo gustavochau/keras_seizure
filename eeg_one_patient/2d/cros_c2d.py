@@ -49,7 +49,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number, size_img, balance=False, bal_ratio=4):
+def data_generator_one_patient(main_folder, patient_number, size_img, balance=False, bal_ratio=1):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -63,7 +63,7 @@ def data_generator_one_patient(main_folder, patient_number, size_img, balance=Fa
         X_train = mat_var['proj_images']
         Y_train = mat_var['total_labels']
 
-        X_train = np.reshape(X_train, (X_train.shape[0], size_img, 23, 1))
+        X_train = np.reshape(X_train, (X_train.shape[0], size_img, size_img, 3))
         #Y_train[Y_train==2]=0 # relabel pre-seizure segments
         X_pat = np.concatenate((X_pat, X_train))
         Y_pat = np.concatenate((Y_pat, Y_train))
@@ -112,7 +112,7 @@ def data_generator_all_patients(main_folder, size_img, list_all_patients, leaveo
 
 if __name__ == "__main__":
 #    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds1/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds1/'
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds1/'
 
     #main_folder = '/home/gchau/data/Data_segmentada_ds1/'
     os.environ['PYTHONHASHSEED'] = '0'
@@ -122,35 +122,35 @@ if __name__ == "__main__":
     batch_size = 128
     num_classes = 2
     epochs = 50
-    size_in = 128
+    size_img = 16
     num_channels =23
 
     model = Sequential()
-    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3)))
+    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv1'))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
-    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3)))
+    #model.add(BatchNormalization())
+    model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv2'))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
+    #model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    # model.add(Dropout(0.3))
-    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid'))
+    model.add(Dropout(0.3))
+    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv3'))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
-    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid'))
+    #model.add(BatchNormalization())
+    model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv4'))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
+    #model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    # model.add(Dropout(0.3))
+    model.add(Dropout(0.3))
     model.add(Flatten())
     model.add(BatchNormalization())
-    model.add(Dense(40))  # ,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Dense(40, name='fc_cnnpura1'))  # ,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
-    # model.add(Dropout(0.3))
-    model.add(Dense(30))  # ,kernel_regularizer=regularizers.l1(0.01)))
+    model.add(Dropout(0.3))
+    model.add(Dense(30, name='fc_cnnpura2'))  # ,kernel_regularizer=regularizers.l1(0.01)))
     model.add(Activation('relu'))
-    # model.add(Dropout(0.3))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dropout(0.3))
+    model.add(Dense(num_classes, activation='softmax', name='fc_cnnpura3'))
     model.summary()
 
 #    model.add(LSTM(20, return_sequences=True))
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     ## Training
 
-    lop = 1
+    lop = 17
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
     list_all_patients = range(1, 17) + range(18, 24)   
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     num_positive = 0
     num_negative = 0
     
-    X_train,Y_train = data_generator_all_patients(main_folder=main_folder, size_img=size_in, list_all_patients=list_all_patients, leaveout=lop)
+    X_train,Y_train = data_generator_all_patients(main_folder=main_folder, size_img=size_img, list_all_patients=list_all_patients, leaveout=lop)
 
     num_positive += sum(Y_train == 1)
     num_negative += sum(Y_train == 0)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
     ###### Load testing data
-    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, size_img=size_in)
+    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=6, size_img=size_img)
     print(X_test.shape)
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     resumen_test = np.zeros(shape=(num_realizations,2))
 
     for zz in range(0,num_realizations):
-        nombre_pesos = 'sparse_pat' + str(lop) + '_weights.h5'
+        nombre_pesos = 'cross2d_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5') # Reinitialize weights
         history = model.fit(X_train, Y_train,

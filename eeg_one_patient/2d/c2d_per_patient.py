@@ -85,7 +85,7 @@ def list_seizures_patient(patient_number):
     return list_seizures[patient_number-1]
 
 
-def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_sample, isTrain=True, balance=False,bal_ratio=1):
+def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_sample, isTrain=True, balance=False,bal_ratio=4):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -141,15 +141,15 @@ def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_s
 
 
 if __name__ == "__main__":
-    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/proj_images_ds1/'
+    #main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/proj_images_ds1/'
     #main_folder = '/home/gchau/data/Data_segmentada_ds1/'
-
-#    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
-    batch_size = 200
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds1/'
+    #    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
+    batch_size = 128
     num_classes = 2
     epochs = 50
     size_img = 16
-    patient_number = 1
+    patient_number = 23
 
     model = Sequential()
     model.add(Conv2D(kernel_size=(3, 3), filters=32, padding = 'valid', input_shape=(size_img, size_img, 3)))
@@ -190,8 +190,9 @@ if __name__ == "__main__":
     resumen_train = np.zeros(shape=(len(list_seizures), 2))
     resumen_test = np.zeros(shape=(len(list_seizures), 2))
     for idx,los in enumerate(list_seizures):
-	print('los:' + str(los))
-        name_save_weights = '2d_weights_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
+        if (idx>0):
+            break
+        name_save_weights = '2d_weights_single_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
         model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                            save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights

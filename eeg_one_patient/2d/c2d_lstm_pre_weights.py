@@ -49,7 +49,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number, num_per_series, size_img, balance=False, bal_ratio=1):
+def data_generator_one_patient(main_folder, patient_number, num_per_series, size_img, balance=False, bal_ratio=4):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -78,6 +78,7 @@ def data_generator_one_patient(main_folder, patient_number, num_per_series, size
     print(sum(Y_pat==0))
     print(sum(Y_pat==1))
     print(sum(Y_pat==2))
+    #Y_pat[Y_pat==2]=0
     if balance:
         num_positive = sum(Y_pat==1)
         #np.random.seed(7)
@@ -110,7 +111,8 @@ def data_generator_all_patients(main_folder, num_per_series, size_img, list_all_
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds30/'
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds30/'
+
     os.environ['PYTHONHASHSEED'] = '0'
     #session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
     #sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
@@ -121,20 +123,20 @@ if __name__ == "__main__":
     size_img = 16
     num_channels =23
     num_per_series = 30
-    lop = 1
+    lop = 6
     model = Sequential()
-    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3)))
-    model.add(Activation('relu'))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
+    #model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32)))
-    model.add(Activation('relu'))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
+    #model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64)))
-    model.add(Activation('relu'))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
+    #model.add(Activation('relu'))
     model.add(Dropout(0.3))
-    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64)))
-    model.add(Activation('relu'))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
+    #model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
     model.add(Dropout(0.3))
     model.add(TimeDistributed(Flatten()))
@@ -204,7 +206,7 @@ if __name__ == "__main__":
 
     for zz in range(0, num_realizations):
         nombre_pesos_pre = '2d_lstm_pre_pat' + str(lop) + '_weights.h5'
-        model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
+        model_checkpoint = ModelCheckpoint(nombre_pesos_pre, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
         history = model.fit(X_train, Y_train,
                             batch_size=batch_size,
