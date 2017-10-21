@@ -6,6 +6,8 @@ the lstm part over them for each specific patient. I want to take look at the we
 from __future__ import print_function
 from keras import regularizers
 from keras.layers import Bidirectional
+from sklearn.preprocessing import scale
+
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
@@ -113,7 +115,7 @@ def data_generator_all_patients(main_folder, num_per_series, size_img, list_all_
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds30/'
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_polar_ds30/'
 
     os.environ['PYTHONHASHSEED'] = '0'
     #session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
@@ -159,7 +161,7 @@ if __name__ == "__main__":
                   optimizer='rmsprop')
 
     model.summary()
-    name_pretrained_weights = 'cross2d_pat' + str(18) + '_weights.h5'
+    name_pretrained_weights = 'cross2d_norm_polar_pat' + str(17) + '_weights.h5'
     model.load_weights(name_pretrained_weights, by_name=True)
     model.save_weights('initial.h5')
 
@@ -189,8 +191,16 @@ if __name__ == "__main__":
     for zz,lop in enumerate(list_all_patients):
         X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=lop,
                                                       num_per_series=num_per_series, size_img=size_img)
+        medias = list()
+        desv_est = list()
+        for cc in range(0,3):
+        #    medias.append(np.mean(X_train[:, :, :, cc]))
+         #   desv_est.append(np.std(X_train[:, :, :, cc]))
+            X_train[:,:,:,:,cc] = np.reshape(scale(X_train[:, :,:,:,cc].flatten()), (X_train.shape[0],num_per_series,size_img, size_img))
+            print(str(np.mean(X_train[:,:,:,:,cc])))
+            print(str(np.std(X_train[:, :, :,:,cc])))
         Y_train = np_utils.to_categorical(Y_train, 2)
-        nombre_pesos_save = 'lstm_experiment_pat' + str(lop) + '_weights.h5'
+        nombre_pesos_save = 'lstm_experiment_polar_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5')  # Reinitialize weights
         history = model.fit(X_train, Y_train,
@@ -201,6 +211,7 @@ if __name__ == "__main__":
                             callbacks=[model_checkpoint],
                             verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
         #model.load_weights(nombre_pesos_save)
+        model.save_weights(nombre_pesos_save)
         print('=== Training ====')
         y_pred_t = np.argmax(model.predict(X_train, verbose=0), axis=1)
         y_true_t = np.argmax(Y_train, axis=1)

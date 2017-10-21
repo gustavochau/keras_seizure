@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 from keras import regularizers
+from sklearn.preprocessing import scale
 from keras.layers import Bidirectional
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten, Permute
@@ -49,7 +50,7 @@ def comp_metric(y_true, y_pred):
     sensitivity = 100.0*float(tp) /float((tp + fn))
     return [sensitivity, fp, fn, tp, tn]
 
-def data_generator_one_patient(main_folder, patient_number, size_img, balance=False, bal_ratio=1):
+def data_generator_one_patient(main_folder, patient_number, size_img, balance=False, bal_ratio=4):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -112,7 +113,9 @@ def data_generator_all_patients(main_folder, size_img, list_all_patients, leaveo
 
 if __name__ == "__main__":
 #    main_folder = '/home/gchau/Documents/data/epilepsia_data/Data_segmentada_ds1/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds1/'
+    #main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds1/'
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_polar_ds1/'
+
 
     #main_folder = '/home/gchau/data/Data_segmentada_ds1/'
     os.environ['PYTHONHASHSEED'] = '0'
@@ -128,28 +131,24 @@ if __name__ == "__main__":
     model = Sequential()
     model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv1'))
     model.add(Activation('relu'))
-    #model.add(BatchNormalization())
+    #model.add(Dropout(0.5))
     model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv2'))
     model.add(Activation('relu'))
-    #model.add(BatchNormalization())
+    #model.add(Dropout(0.5))
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.3))
     model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv3'))
     model.add(Activation('relu'))
-    #model.add(BatchNormalization())
+    #model.add(Dropout(0.5))
     model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv4'))
     model.add(Activation('relu'))
-    #model.add(BatchNormalization())
+    #model.add(Dropout(0.5))
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.3))
     model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(Dense(40, name='fc_cnnpura1'))  # ,kernel_regularizer=regularizers.l1(0.01)))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.3))
-    model.add(Dense(30, name='fc_cnnpura2'))  # ,kernel_regularizer=regularizers.l1(0.01)))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    #model.add(BatchNormalization())
+    #model.add(Dense(512, name='fc_cnnpura1'))  # ,kernel_regularizer=regularizers.l1(0.01)))
+    #model.add(Activation('relu'))
+    #model.add(Dropout(0.5))
+    #model.add(Dropout(0.3))
     model.add(Dense(num_classes, activation='softmax', name='fc_cnnpura3'))
     model.summary()
 
@@ -173,7 +172,7 @@ if __name__ == "__main__":
 
     ## Training
 
-    lop = 17
+    lop = 1
     #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_in=size_in, leaveout_sample=los,
     #                                              isTrain=True)
     list_all_patients = range(1, 17) + range(18, 24)   
@@ -186,6 +185,15 @@ if __name__ == "__main__":
     num_negative = 0
     
     X_train,Y_train = data_generator_all_patients(main_folder=main_folder, size_img=size_img, list_all_patients=list_all_patients, leaveout=lop)
+
+    medias = list()
+    desv_est = list()
+    for cc in range(0,3):
+        medias.append(np.mean(X_train[:, :, :, cc]))
+        desv_est.append(np.std(X_train[:, :, :, cc]))
+        X_train[:, :,:, cc] = np.reshape(scale(X_train[:, :,:, cc].flatten()), (X_train.shape[0],16, 16))
+        print(str(np.mean(X_train[:,:,:,cc])))
+        print(str(np.std(X_train[:, :, :,cc])))
 
     num_positive += sum(Y_train == 1)
     num_negative += sum(Y_train == 0)
@@ -202,26 +210,30 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
     ###### Load testing data
-    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=6, size_img=size_img)
+    X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, size_img=size_img)
+
+    for cc in range(0,3):   
+        X_test[:,:,:,cc] = X_test[:,:,:,cc]-medias[cc]
+        X_test[:, :, :, cc] = (1.0/desv_est[cc])*X_test[:,:,:,cc]
     print(X_test.shape)
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
 
-    num_realizations = 3
+    num_realizations = 1
     resumen_train = np.zeros(shape=(num_realizations,2))
     resumen_test = np.zeros(shape=(num_realizations,2))
 
     for zz in range(0,num_realizations):
-        nombre_pesos = 'cross2d_pat' + str(lop) + '_weights.h5'
+        nombre_pesos = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
         model.load_weights('initial.h5') # Reinitialize weights
         history = model.fit(X_train, Y_train,
                         batch_size=batch_size,
                         epochs=epochs,
                         shuffle=True,
-                        validation_split=0.1,
-                        callbacks=[model_checkpoint],
-                        verbose=0, class_weight=class_weight)#, callbacks=[early_stopping])
+                        validation_split=0.2,
+                        callbacks=[early_stopping],
+                        verbose=2, class_weight=class_weight)#, callbacks=[early_stopping])
         model.load_weights(nombre_pesos)
         score = model.evaluate(X_test, Y_test, verbose=1)
 

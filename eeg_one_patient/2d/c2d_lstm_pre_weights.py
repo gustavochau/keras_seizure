@@ -4,6 +4,7 @@
 from __future__ import print_function
 from keras import regularizers
 from keras.layers import Bidirectional
+from sklearn.preprocessing import scale
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
@@ -17,7 +18,7 @@ from keras import backend as K
 from keras import regularizers
 #import matplotlib.pyplot as plt
 import numpy as np
-np.random.seed(7)
+#np.random.seed(7)
 import math
 import pickle
 from keras import metrics
@@ -27,10 +28,10 @@ from keras.layers.wrappers import TimeDistributed
 from keras.layers import LSTM
 #import myEmbedLayer
 import random
-random.seed(45) 
+#random.seed(45) 
 import os
 import tensorflow as tf
-tf.set_random_seed(45)
+#tf.set_random_seed(45)
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(labels_dict.values())
@@ -111,42 +112,42 @@ def data_generator_all_patients(main_folder, num_per_series, size_img, list_all_
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
-    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds30/'
-
+    #main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_ds30/'
+    main_folder = '/home/gchau/Documents/data/epilepsia_data/proj_images_polar_ds30/'
     os.environ['PYTHONHASHSEED'] = '0'
     #session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
     #sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
     #K.set_session(sess)
-    batch_size = 30
+    batch_size = 128
     num_classes = 2
     epochs = 40
     size_img = 16
     num_channels =23
     num_per_series = 30
-    lop = 6
+    lop = 2
     model = Sequential()
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
-    #model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    model.add(Activation('relu'))
+    #model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
-    #model.add(Activation('relu'))
+    model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
-    model.add(Dropout(0.3))
+    #model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
-    #model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    model.add(Activation('relu'))
+    #model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
-    #model.add(Activation('relu'))
+    model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
-    model.add(Dropout(0.3))
+    #model.add(Dropout(0.5))
     model.add(TimeDistributed(Flatten()))
-    model.add(TimeDistributed(BatchNormalization()))
+    #model.add(TimeDistributed(BatchNormalization()))
     model.add(Bidirectional(LSTM(128,return_sequences=False)))
     model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    #model.add(Dropout(0.5))
     model.add(Dense(512))
     model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    #model.add(Dropout(0.5))
     model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
     model.summary()
 
@@ -157,7 +158,7 @@ if __name__ == "__main__":
                   optimizer='rmsprop')
 
     model.summary()
-    name_pretrained_weights = 'cross2d_pat' + str(lop) + '_weights.h5'
+    name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
     model.load_weights(name_pretrained_weights, by_name=True)
     model.save_weights('initial.h5')
 
@@ -179,6 +180,17 @@ if __name__ == "__main__":
     num_negative = 0
 
     X_train,Y_train = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_img=size_img, list_all_patients=list_all_patients, leaveout=lop)
+    
+    medias = list()
+    desv_est = list()
+    for cc in range(0,3):
+        medias.append(np.mean(X_train[:, :, :, :, cc]))
+        desv_est.append(np.std(X_train[:, :, :, :, cc]))
+        X_train[:,:,:,:,cc] = np.reshape(scale(X_train[:, :,:,:,cc].flatten()), (X_train.shape[0],num_per_series,size_img, size_img))
+        print(str(np.mean(X_train[:,:,:,:,cc])))
+        print(str(np.std(X_train[:, :, :,:,cc])))
+        
+
     print(Y_train)
     num_positive += sum(Y_train == 1)
     num_negative += sum(Y_train == 0)
@@ -192,10 +204,13 @@ if __name__ == "__main__":
 
     Y_train = np_utils.to_categorical(Y_train, 2)
         #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
-    early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+    early_stopping = EarlyStopping(monitor='val_categorical_accuracy', patience=1)
 
     ###### Load testing data
     X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_img=size_img)
+    for cc in range(0,3):   
+        X_test[:,:,:,:,cc] = X_test[:,:,:,:,cc]-medias[cc]
+        X_test[:,:,:,:,cc] = (1.0/desv_est[cc])*X_test[:,:,:,:,cc]
     print(X_test.shape)
     print(Y_test.shape)
     Y_test = np_utils.to_categorical(Y_test,2)
@@ -207,13 +222,20 @@ if __name__ == "__main__":
     for zz in range(0, num_realizations):
         nombre_pesos_pre = '2d_lstm_pre_pat' + str(lop) + '_weights.h5'
         model_checkpoint = ModelCheckpoint(nombre_pesos_pre, monitor='val_categorical_accuracy', save_best_only=True)
-        model.load_weights('initial.h5')  # Reinitialize weights
+        #model.load_weights('initial.h5')  # Reinitialize weights
+        model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
+                  optimizer='rmsprop')
+        name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
+        model.load_weights(name_pretrained_weights, by_name=True)
+        permuted_indexes = np.random.permutation(Y_train.shape[0])    
+        X_train = X_train[permuted_indexes,:,:,:]
+        Y_train = Y_train[permuted_indexes]
         history = model.fit(X_train, Y_train,
                             batch_size=batch_size,
                             epochs=epochs,
                             shuffle=True,
-                            validation_split=0.1,
-                            callbacks=[model_checkpoint],
+                            validation_split=0.2,
+                            callbacks=[early_stopping],
                             verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
         model.load_weights(nombre_pesos_pre)
         score = model.evaluate(X_test, Y_test, verbose=1)
