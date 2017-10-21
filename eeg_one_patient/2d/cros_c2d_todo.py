@@ -246,7 +246,7 @@ if __name__ == "__main__":
                             epochs=epochs,
                             shuffle=True,
                             validation_split=0.2,
-                            callbacks=[early_stopping],
+                            callbacks=[model_checkpoint],
                             verbose=0, class_weight=class_weight)#, callbacks=[early_stopping])
             model.load_weights(nombre_pesos)
             model.save_weights(nombre_pesos)
@@ -285,10 +285,10 @@ if __name__ == "__main__":
         results_summary[lop,2] = promedio_test[0]
         results_summary[lop,3] = promedio_test[1]
 
-        variables_save = dict()
-        variables_save['results_summary'] = results_summary
+    variables_save = dict()
+    variables_save['results_summary'] = results_summary
 
         #with open('objs.pickle', 'w') as f:  # Python 3: open(..., 'wb')
         #    pickle.dump(variables_save, f)
-        savemat(file_name = 'cnn_only_todo.mat', mdict=variables_save)
+    savemat(file_name = 'cnn_only_todo.mat', mdict=variables_save)
         #model.save('lstm_lop' + str(lop))

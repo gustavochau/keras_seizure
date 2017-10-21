@@ -100,15 +100,19 @@ def data_generator_all_patients(main_folder, num_per_series, size_img, list_all_
     print(list_patients_training)
     X = np.zeros(shape=(0, num_per_series, size_img, size_img, 3))
     Y = np.zeros(shape=(0, 1))
+    pat_indicator = np.zeros(shape=(0, 1))
     for i in list_patients_training:
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=i, size_img=size_img, balance=True)
         X = np.concatenate((X, X_temp))
         Y = np.concatenate((Y, Y_temp))
+        pat_indicator = np.concatenate((pat_indicator, i*np.ones(shape=(X_temp.shape[0],1)) ))
+
     # shuffle data
     permuted_indexes = np.random.permutation(Y.shape[0])    
     X = X[permuted_indexes,:,:,:]
     Y = Y[permuted_indexes]
-    return X,Y
+    pat_indicator = pat_indicator[permuted_indexes]
+    return X,Y,pat_indicator
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
