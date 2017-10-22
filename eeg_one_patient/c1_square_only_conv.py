@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     list_all_patients = range(1, 17) + range(18, 24)
     #X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=50)
-    contenedor = np.load('30seg.npz')
+    contenedor = np.load('1seg.npz')
     X_data_all = contenedor['X']
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in [1,2]: #list_all_patients:
+    for lop in [6]: #list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
@@ -152,24 +152,16 @@ if __name__ == "__main__":
 
         # Define model
         model = Sequential()
-        model.add(
-            TimeDistributed(Conv2D(kernel_size=(30, 1), filters=nb_filters),
-                            input_shape=(num_per_series, size_in, num_channels, 1),
-                            name='conv1'))  # model frequency filters
+        model.add(Conv2D(kernel_size=(30, 1), filters=nb_filters,input_shape=(size_in, num_channels, 1),name='conv1'))  # model frequency filters
         model.add(Lambda(lambda x: x ** 2))  # energy
-        model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1))))
-        model.add(Permute((1, 4, 3, 2)))
-        model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
-        model.add(TimeDistributed(Flatten()))
-        model.add((BatchNormalization()))
+        model.add(AveragePooling2D(pool_size=(99, 1)))
+        model.add(Flatten())
+        model.add(BatchNormalization())
         model.add(Dropout(0.5))
-        model.add(Bidirectional(LSTM(30, return_sequences=False), name='lstm'))
+        model.add(Dense(200))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        #model.add(Dense(512, name='fc1-l'))
-        #model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        model.add(Dense(128, name='fc2-l'))
+        model.add(Dense(50))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name='output_layer'))
@@ -248,13 +240,13 @@ if __name__ == "__main__":
             y_true_t = np.argmax(Y_train, axis=1)
             metrics_t = comp_metric(y_true_t, y_pred_t)
             print('Train sensitivity:', metrics_t[0])
-            print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0]) * 30.0 / 3600.0))
+            print('Train false positive rate:', float(metrics_t[1]) / (float(X_train.shape[0]) * 1.0 / 3600.0))
 
             resumen_train[zz, 0] = metrics_t[0]
-            resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0]) * 30.0 / 3600.0)
+            resumen_train[zz, 1] = float(metrics_t[1]) / (float(X_train.shape[0]) * 1.0 / 3600.0)
 
             results_summary[lop, 0, zz] = metrics_t[0]
-            results_summary[lop, 1, zz] = float(metrics_t[1]) / (float(X_train.shape[0]) * 30.0 / 3600.0)
+            results_summary[lop, 1, zz] = float(metrics_t[1]) / (float(X_train.shape[0]) * 1.0 / 3600.0)
 
             print('=== Test ====')
             y_pred = np.argmax(model.predict(X_test, verbose=0), axis=1)
@@ -262,12 +254,12 @@ if __name__ == "__main__":
             metrics_test = comp_metric(y_true, y_pred)
             print('Test sensitivity:', metrics_test[0])
             #    print('Test # false positives:', metrics_test[1])
-            print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0]) * 30.0 / 3600.0))
+            print('Test false positive rate:', float(metrics_test[1]) / (float(X_test.shape[0]) * 1.0 / 3600.0))
 
             resumen_test[zz, 0] = metrics_test[0]
-            resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0]) * 30.0 / 3600.0)
+            resumen_test[zz, 1] = float(metrics_test[1]) / (float(X_test.shape[0]) * 1.0 / 3600.0)
             results_summary[lop, 2, zz] = metrics_test[0]
-            results_summary[lop, 3, zz] = float(metrics_test[1]) / (float(X_test.shape[0]) * 30.0 / 3600.0)
+            results_summary[lop, 3, zz] = float(metrics_test[1]) / (float(X_test.shape[0]) * 1.0 / 3600.0)
 
         promedio_train = np.average(resumen_train, axis=0)
         promedio_test = np.average(resumen_test, axis=0)
@@ -280,4 +272,4 @@ if __name__ == "__main__":
     variables_save['results_summary'] = results_summary
 
 
-    savemat(file_name='conv_1d_pre_lstm_todo.mat', mdict=variables_save)
+    savemat(file_name='energy_only_conv.mat', mdict=variables_save)

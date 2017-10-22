@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     results_summary = np.zeros(shape=(24, 4))
 
-    for lop in list_all_patients:
+    for lop in [1]: #list_all_patients:
         print('=== processing patient' + str(lop) + '=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
