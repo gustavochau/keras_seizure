@@ -8,6 +8,9 @@
 *.pickle
 *.zip
 *.h5
+*.np
+*.npz
+
 /eeg_one_patient/.idea/workspace.xml
 **/.idea/**/workspace.xml
 

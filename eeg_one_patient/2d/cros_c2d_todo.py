@@ -168,7 +168,7 @@ if __name__ == "__main__":
         #model.add(BatchNormalization())
         #model.add(Dense(512, name='fc_cnnpura1'))  # ,kernel_regularizer=regularizers.l1(0.01)))
         #model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
+        model.add(Dropout(0.5))
         #model.add(Dropout(0.3))
         model.add(Dense(num_classes, activation='softmax', name='fc_cnnpura3'))
         #model.summary()
@@ -216,7 +216,7 @@ if __name__ == "__main__":
         #print(num_negative)
 
         class_weight = {0: 1.0,
-                        1: 1.0} #float(num_negative)/float(num_positive)}
+                        1: 4.0} #float(num_negative)/float(num_positive)}
 
                 
         Y_train = np_utils.to_categorical(Y_train, 2)
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0,num_realizations):
-            nombre_pesos = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
+            nombre_pesos = 'cross2d_norm_polar_pat' + str(lop) + '_weights_dropdense.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
             model.load_weights('initial.h5') # Reinitialize weights
             history = model.fit(X_train, Y_train,

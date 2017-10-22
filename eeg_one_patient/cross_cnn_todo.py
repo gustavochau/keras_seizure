@@ -98,6 +98,7 @@ def data_generator_all_patients(main_folder, size_in, list_all_patients, leaveou
     print(list_patients_training)
     X = np.zeros(shape=(0, size_in, 23,1))
     Y = np.zeros(shape=(0, 1))
+    pat_indicator = np.zeros(shape=(0, 1))
     for i in list_patients_training:
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, patient_number=i, size_in=size_in, balance=True)
         X = np.concatenate((X, X_temp))
@@ -123,14 +124,14 @@ if __name__ == "__main__":
     #K.set_session(sess)
     batch_size = 128
     num_classes = 2
-    epochs = 50
+    epochs = 40
     size_in = 128
     num_channels =23
 
     list_all_patients = range(1, 17) + range(18, 24)
 
     # load the patient of all data
-    X_data_all, Y_data_all, pat_indicator = data_generator_all_patients(main_folder=main_folder, size_img=size_img,
+    X_data_all, Y_data_all, pat_indicator = data_generator_all_patients(main_folder=main_folder, size_in=size_in,
                                                                         list_all_patients=list_all_patients, leaveout=50)
     print('todo: ' + str(X_data_all.shape))
 
@@ -150,7 +151,7 @@ if __name__ == "__main__":
         model.add(Conv2D(kernel_size=(30,1),filters=40, input_shape=(size_in,num_channels,1),name='conv1'))
         model.add(Activation('relu'))
         model.add(Permute((1, 3, 2)))
-        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.01)))))
+        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.01),name='mix_dense_1'))))
         model.add(Permute((1, 3, 2)))
         model.add(MaxPooling2D(pool_size=(2,1)))
         model.add(Dropout(0.5))
@@ -202,7 +203,7 @@ if __name__ == "__main__":
                             shuffle=True,
                             validation_split=0.2,
                             callbacks=[model_checkpoint],
-                            verbose=0, class_weight=class_weight)#, callbacks=[early_stopping])
+                            verbose=2, class_weight=class_weight)#, callbacks=[early_stopping])
             model.load_weights(nombre_pesos)
             model.save_weights(nombre_pesos)
             score = model.evaluate(X_test, Y_test, verbose=1)

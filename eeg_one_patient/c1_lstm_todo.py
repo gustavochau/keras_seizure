@@ -5,7 +5,7 @@ from __future__ import print_function
 from keras import regularizers
 from keras.layers import Bidirectional
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten
+from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten, Permute
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
 from keras.optimizers import SGD
 from os import listdir
@@ -103,6 +103,8 @@ def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_p
         X_temp, Y_temp = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=i, size_in=size_in, balance=True)
         X = np.concatenate((X, X_temp))
         Y = np.concatenate((Y, Y_temp))
+        pat_indicator = np.concatenate((pat_indicator, i*np.ones(shape=(X_temp.shape[0],1)) ))
+
     # shuffle data
     permuted_indexes = np.random.permutation(Y.shape[0])    
     X = X[permuted_indexes,:,:,:]
@@ -125,13 +127,17 @@ if __name__ == "__main__":
     num_per_series = 30
 
     list_all_patients = range(1, 17) + range(18, 24)
-    X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=lop)
+    #X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, num_per_series=num_per_series, size_in=size_in, list_all_patients=list_all_patients, leaveout=50)
+    contenedor = np.load('30seg.npz')
+    X_data_all = contenedor['X']
+    Y_data_all = contenedor['Y']
+    pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
     num_realizations = 3
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in [1,2]:#list_all_patients:
+    for lop in [1,2]: #list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
@@ -150,20 +156,23 @@ if __name__ == "__main__":
         model.add(Permute((1,2, 4, 3)))
         model.add(TimeDistributed(MaxPooling2D(pool_size=(2, 1))))
         model.add(Dropout(0.5))
-        model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30, name = 'conv2')))
-        model.add(Activation('relu'))
-        model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-        model.add(Dropout(0.5))
-        model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20, name = 'conv3')))
-        model.add(Activation('relu'))
-        model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
-        model.add(Dropout(0.5))
+        #model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30, name = 'conv2')))
+        #model.add(Activation('relu'))
+        #model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1)),name='pool2'))
+        #model.add(Dropout(0.5))
+        #model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20, name = 'conv3')))
+        #model.add(Activation('relu'))
+        #model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
+        #model.add(Dropout(0.5))
         model.add(TimeDistributed(Flatten()))
         model.add(TimeDistributed(BatchNormalization()))
-        model.add(Bidirectional(LSTM(128,return_sequences=False)))
+        model.add(Bidirectional(LSTM(40,return_sequences=False)))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(512, name = 'fc1-l'))
+        model.add(Dense(50, name = 'fc1-l'))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(30, name = 'fc2-l'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
@@ -172,16 +181,16 @@ if __name__ == "__main__":
         model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
                       optimizer='rmsprop')
 
-        name_pretrained_weights = 'c1d_only_sparse_pat' + str(lop) + '_weights.h5'
-        model.load_weights(name_pretrained_weights, by_name=True)
-        model.save_weights('initial.h5')
+        #name_pretrained_weights = 'c1d_only_sparse_pat' + str(lop) + '_weights.h5'
+        #model.load_weights(name_pretrained_weights, by_name=True)
+        model.save_weights('initials.h5')
 
 
         #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
         ## Training
 
-        print(num_negative)
+        #print(num_negative)
 
         class_weight = {0: 1.0,
                         1: 1.0} #float(num_negative)/float(num_positive)}
@@ -197,10 +206,9 @@ if __name__ == "__main__":
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0, num_realizations):
-            model.load_weights('initials')
+            model.load_weights('initials.h5')
             nombre_pesos_save = 'c1_lstm_pretrained_pat' + str(lop) + '_weights.h5'
-            model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
-            model.load_weights('initial.h5')  # Reinitialize weights
+            model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             history = model.fit(X_train, Y_train,
                                 batch_size=batch_size,
                                 epochs=epochs,
