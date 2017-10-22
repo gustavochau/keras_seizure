@@ -160,6 +160,8 @@ if __name__ == "__main__":
         model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1))))
         model.add(Permute((1, 4, 3, 2)))
         model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
+        model.add(Dropout(0.5))
+        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.01)))))
         model.add(TimeDistributed(Flatten()))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
