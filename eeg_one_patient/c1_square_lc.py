@@ -136,7 +136,7 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 3
+    num_realizations = 5
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
@@ -159,24 +159,24 @@ if __name__ == "__main__":
                             input_shape=(num_per_series, size_in, num_channels, 1),
                             name='conv1'))  # model frequency filters
         model.add(Lambda(lambda x: x ** 2))  # energy
-        model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1))))
+        model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1)),name='pooling'))
         model.add(Permute((1, 4, 3, 2)))
         model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
         model.add(Dropout(0.5))
-        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1)))))
-        model.add(TimeDistributed(Flatten()))
+        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1))),name='sparse'))
+        model.add(TimeDistributed(Flatten(),name='flatten'))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
-        model.add(Bidirectional(LSTM(30, return_sequences=False), name='lstm'))
+        model.add(Bidirectional(LSTM(30, return_sequences=False, name='lstm')))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         #model.add(Dense(512, name='fc1-l'))
         #model.add(Activation('relu'))
         #model.add(Dropout(0.5))
-        model.add(Dense(128, name='fc2-l'))
+        model.add(Dense(128, name='fc1'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(num_classes, activation='softmax', name='output_layer'))
+        model.add(Dense(num_classes, activation='softmax', name='salida'))
         #model.summary()
 
         # model.add(Activation('relu'))
@@ -209,8 +209,8 @@ if __name__ == "__main__":
         model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
                       optimizer='rmsprop')
 
-        #name_pretrained_weights = 'c1d_only_sparse_pat' + str(lop) + '_weights.h5'
-        #model.load_weights(name_pretrained_weights, by_name=True)
+        name_pretrained_weights = 'c1_square_onlyconv_' + str(lop) + '_weights.h5'
+        model.load_weights(name_pretrained_weights, by_name=True)
         model.save_weights('initials.h5')
 
 
@@ -229,13 +229,12 @@ if __name__ == "__main__":
             #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
         #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
-        num_realizations = 5
         resumen_train = np.zeros(shape=(num_realizations,2))
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0, num_realizations):
             model.load_weights('initials.h5')
-            nombre_pesos_save = 'c1_lstm_pretrained_pat' + str(lop) + '_weights.h5'
+            nombre_pesos_save = 'c1_energy_lstm_pretrained_pat' + str(lop) + '_weights.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             history = model.fit(X_train, Y_train,
                                 batch_size=batch_size,
