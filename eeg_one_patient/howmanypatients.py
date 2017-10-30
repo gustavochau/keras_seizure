@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     batch_size = 20
     num_classes = 2
-    epochs = 1
+    epochs = 40
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -135,7 +135,8 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 1
+    num_realizations = 3
+    #list_all_patients = range(1, 17) + range(18, 24)
     list_all_patients = list(set(range(1, 17) + range(18, 24)) - set([6, 12, 14, 16]))
     num_other_patients = len(list_all_patients)-1
     results_summary = np.zeros(shape=(num_other_patients, 4, num_realizations))
@@ -154,11 +155,18 @@ if __name__ == "__main__":
         model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1))))
         model.add(Permute((1, 4, 3, 2)))
         model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
+        model.add(Dropout(0.5))
+        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1)))))
         model.add(TimeDistributed(Flatten()))
+        model.add((BatchNormalization()))
+        model.add(Dropout(0.5))
         model.add(Bidirectional(LSTM(30, return_sequences=False), name='lstm'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(15, name='fc1-l'))
+        #model.add(Dense(512, name='fc1-l'))
+        #model.add(Activation('relu'))
+        #model.add(Dropout(0.5))
+        model.add(Dense(128, name='fc2-l'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name='output_layer'))
@@ -175,7 +183,7 @@ if __name__ == "__main__":
 
             take_patient_order = [list_patients_training[ii] for ii in permuted_indexes]
             print('all: '+str(take_patient_order))
-            for pp in range(0,4): #range(0,num_other_patients):
+            for pp in range(0,num_other_patients):
                 print('Taking ' + str(pp+1) + ' patient(s)')
                 subset_patients = take_patient_order[0:pp+1] # take first pp+1 patients
                 print(subset_patients)
@@ -195,7 +203,6 @@ if __name__ == "__main__":
                 resumen_train = np.zeros(shape=(num_realizations,2))
                 resumen_test = np.zeros(shape=(num_realizations,2))
 
-
                 model.load_weights('initials.h5')
                 nombre_pesos_save = 'c1_lstm_pat' + str(lop) + '_weights_taking' + str(pp+1) + '.h5'
                 model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
@@ -205,7 +212,7 @@ if __name__ == "__main__":
                                     shuffle=True,
                                     validation_split=0.2,
                                     callbacks=[model_checkpoint],
-                                    verbose=1, class_weight=class_weight)  # , callbacks=[early_stopping])
+                                    verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
                 model.load_weights(nombre_pesos_save)
                 score = model.evaluate(X_test, Y_test, verbose=1)
 

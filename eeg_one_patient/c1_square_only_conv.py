@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     batch_size = 30
     num_classes = 2
-    epochs = 40
+    epochs = 80
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -136,11 +136,11 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 3
+    num_realizations = 1
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in [6]: #list_all_patients:
+    for lop in list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
@@ -155,17 +155,22 @@ if __name__ == "__main__":
         model.add(Conv2D(kernel_size=(30, 1), filters=nb_filters,input_shape=(size_in, num_channels, 1),name='conv1'))  # model frequency filters
         model.add(Lambda(lambda x: x ** 2))  # energy
         model.add(AveragePooling2D(pool_size=(99, 1)))
+        model.add(Permute((3, 2, 1)))
+        model.add(Reshape((nb_filters, num_channels)))  # series x bands x channels
+        model.add(Dropout(0.5))
+        model.add(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1))))
         model.add(Flatten())
-        model.add(BatchNormalization())
+        model.add((BatchNormalization()))
         model.add(Dropout(0.5))
-        model.add(Dense(200))
+        model.add(Dense(50, name = 'fc1-l'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(50))
+        model.add(Dense(30, name = 'fc2-l'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(num_classes, activation='softmax', name='output_layer'))
-        #model.summary()
+        model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
+
+        model.summary()
 
         # model.add(Activation('relu'))
         # model.add(Permute((1,2, 4, 3)))
@@ -217,13 +222,12 @@ if __name__ == "__main__":
             #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
         #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
-        num_realizations = 3
         resumen_train = np.zeros(shape=(num_realizations,2))
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0, num_realizations):
             model.load_weights('initials.h5')
-            nombre_pesos_save = 'c1_lstm_pretrained_pat' + str(lop) + '_weights.h5'
+            nombre_pesos_save = 'c1_square_onlyconv_' + str(lop) + '_weights.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             history = model.fit(X_train, Y_train,
                                 batch_size=batch_size,

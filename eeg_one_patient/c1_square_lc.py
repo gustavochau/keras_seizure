@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     batch_size = 30
     num_classes = 2
-    epochs = 40
+    epochs = 100
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -140,13 +140,15 @@ if __name__ == "__main__":
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in [1,2]: #list_all_patients:
+    for lop in list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
         Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
         X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
         Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
+        #X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
+        
         print('train: ' +str(X_train.shape))
         print('test: ' +str(X_test.shape))
 
@@ -161,7 +163,7 @@ if __name__ == "__main__":
         model.add(Permute((1, 4, 3, 2)))
         model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
         model.add(Dropout(0.5))
-        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.01)))))
+        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1)))))
         model.add(TimeDistributed(Flatten()))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
@@ -227,7 +229,7 @@ if __name__ == "__main__":
             #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
         #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
 
-        num_realizations = 3
+        num_realizations = 5
         resumen_train = np.zeros(shape=(num_realizations,2))
         resumen_test = np.zeros(shape=(num_realizations,2))
 
@@ -241,7 +243,7 @@ if __name__ == "__main__":
                                 shuffle=True,
                                 validation_split=0.2,
                                 callbacks=[model_checkpoint],
-                                verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
+                                verbose=0, class_weight=class_weight)  # , callbacks=[early_stopping])
             model.load_weights(nombre_pesos_save)
             score = model.evaluate(X_test, Y_test, verbose=1)
 
@@ -282,4 +284,4 @@ if __name__ == "__main__":
     variables_save['results_summary'] = results_summary
 
 
-    savemat(file_name='conv_1d_pre_lstm_todo.mat', mdict=variables_save)
+    savemat(file_name='conv_1d_pre_lstm_todo_subset.mat', mdict=variables_save)
