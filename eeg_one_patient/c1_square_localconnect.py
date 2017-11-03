@@ -5,9 +5,9 @@ from __future__ import print_function
 from keras import regularizers
 from keras.layers import Bidirectional
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten, Permute, Lambda, AveragePooling2D, Reshape
+from keras.layers import Dense, Dropout, Activation, BatchNormalization, Flatten, Permute, Lambda, AveragePooling2D, Reshape, LocallyConnected1D, LocallyConnected2D
 from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
-from keras.optimizers import SGD, RMSprop
+from keras.optimizers import SGD
 from os import listdir
 from scipy.io import loadmat
 from scipy.io import savemat
@@ -107,93 +107,10 @@ def data_generator_all_patients(main_folder, num_per_series, size_in, list_all_p
 
     # shuffle data
     permuted_indexes = np.random.permutation(Y.shape[0])    
-    X = X[permuted_indexes,:,:,:,:]
+    X = X[permuted_indexes,:,:,:]
     Y = Y[permuted_indexes]
     pat_indicator = pat_indicator[permuted_indexes]
     return X,Y,pat_indicator
-
-def list_seizures_patient(patient_number):
-    list_seizures = []
-    for i in range(23):
-        list_seizures.append([])
-    list_seizures[0] = [3, 4, 15, 16, 18, 21, 26]
-    list_seizures[1] = [16, 19]
-    list_seizures[2] = [1, 2, 3, 4, 34, 35, 36]
-    list_seizures[3] = [5, 8, 28]
-    list_seizures[4] = [6, 13, 16, 17, 22]
-    list_seizures[5] = [1, 4, 9, 10, 13, 18, 24]
-    list_seizures[6] = [12, 13, 19]
-    list_seizures[7] = [2, 5, 11, 13, 21]
-    list_seizures[8] = [6, 8, 19]
-    list_seizures[9] = [12, 20, 27, 30, 31, 38, 89]
-    list_seizures[10] = [82, 92, 99]
-    list_seizures[11] = [6, 8, 9, 10, 11, 23, 33, 36, 38, 42]
-    list_seizures[12] = [19, 21, 55, 58, 59, 60, 62]
-    list_seizures[13] = [3, 4, 6, 11, 17, 18, 27]
-    list_seizures[14] = [6, 10, 15, 17, 20, 22, 28, 31, 40, 46, 49, 52, 54, 62]
-    list_seizures[15] = [10, 11, 14, 16, 17]
-    list_seizures[17] = [29, 30, 31, 32, 35, 36]
-    list_seizures[18] = [28, 29, 30]
-    list_seizures[19] = [12, 13, 14, 15, 16, 68]
-    list_seizures[20] = [19, 20, 21, 22]
-    list_seizures[21] = [20, 25, 38]
-    list_seizures[22] = [6, 8, 9]
-    return list_seizures[patient_number-1]
-
-def data_generator_one_patient2(main_folder, patient_number, num_per_series, size_in, leaveout_sample, isTest=True, balance=False,bal_ratio=4):
-    nb_classes = 2
-    patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
-    print(patient_folder)
-    list_samples = listdir(patient_folder)
-    print(list_samples)
-    if (isTest):
-        # take all series except for the one for testing
-        X = np.zeros(shape=(0, num_per_series, size_in, 23, 1))
-        Y = np.zeros(shape=(0, 1))
-        for sample in list_samples:
-            # if is not the one to be tested
-            if (sample != ('chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2))):
-                #print(sample)
-                mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
-                X_train = mat_var['total_series']
-		#print(X_train.shape)
-                X_train = X_train.reshape(X_train.shape[0], num_per_series, size_in, 23, 1)
-                Y_train = mat_var['total_labels']
-                X_train = np.compress((Y_train != 2).flatten(), X_train, 0)  # get rid of pre-ictal
-                Y_train = np.compress((Y_train != 2).flatten(), Y_train, 0)  # get rid of pre-ictal
-                # yield X_train, Y_train
-
-                X = np.concatenate((X, X_train))
-                Y = np.concatenate((Y, Y_train))
-
-        return X, Y
-    else:
-        # take only the one for testing
-        # (X, Y) = folder_to_dataset(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(2),size_img)
-        mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
-                2) + '_seg.mat')
-        X = mat_var['total_series']
-        X = X.reshape(X.shape[0],  num_per_series, size_in, 23, 1)
-        Y = mat_var['total_labels']
-        X = np.compress((Y != 2).flatten(), X, axis=0) # get rid of pre-ictal
-        Y = np.compress((Y != 2).flatten(), Y, axis=0) # get rid of pre-ictal
-        #Y[Y==2]=0
-        #Y = np_utils.to_categorical(Y, 2)
-        if balance:
-            num_positive = sum(Y == 1)
-            ind_negative = np.where(Y == 0)[0]
-            sel_ind_negative = random.sample(ind_negative, num_positive[0] * bal_ratio)
-            not_selected = list(set(ind_negative) - set(sel_ind_negative))  # which rows to remove
-            X = np.delete(X, not_selected, 0)
-            Y = np.delete(Y, not_selected, 0)
-
-        # shuffle data
-        permuted_indexes = np.random.permutation(Y.shape[0])
-        X = X[permuted_indexes, :, :, :,:]
-        Y = Y[permuted_indexes]
-
-        return X, Y
-        # yield X_test, Y_test
 
 if __name__ == "__main__":
     #main_folder = '/home/gchau/Documents/data/epilepsia_data_subset/Data_segmentada_ds/'
@@ -206,7 +123,7 @@ if __name__ == "__main__":
 
     batch_size = 30
     num_classes = 2
-    epochs = 0 # many less epochs
+    epochs = 50
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -219,24 +136,19 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 5
+    num_realizations = 3
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in list_all_patients:
+    for lop in [2,3,4]: #list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
-        #X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        #Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        #X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
-        #Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
+        X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
+        Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
+        X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
+        Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
         #X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
-        lista_seizures = list_seizures_patient(lop)
-        los = lista_seizures[random.randint(0,len(lista_seizures))]
-        X_train, Y_train = data_generator_one_patient2(main_folder=main_folder, patient_number=lop, size_in = size_in, num_per_series = num_per_series, leaveout_sample=los,
-                                                      isTest=False, balance=True)
-        X_test, Y_test = data_generator_one_patient2(main_folder=main_folder, patient_number=lop, size_in=size_in, num_per_series= num_per_series, leaveout_sample=los,
-                                                      isTest=True, balance=False)
+        
         print('train: ' +str(X_train.shape))
         print('test: ' +str(X_test.shape))
 
@@ -249,33 +161,64 @@ if __name__ == "__main__":
         model.add(Lambda(lambda x: x ** 2))  # energy
         model.add(TimeDistributed(AveragePooling2D(pool_size=(99, 1)),name='pooling'))
         model.add(Permute((1, 4, 3, 2)))
-        model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
+        #model.add(Reshape((num_per_series, nb_filters, num_channels)))  # series x bands x channels
         model.add(Dropout(0.5))
-        model.add(TimeDistributed(TimeDistributed(Dense(40,kernel_regularizer=regularizers.l1(0.1))),name='sparse'))
+        model.add(TimeDistributed(TimeDistributed(Conv1D(32,3)),name='local'))
         model.add(TimeDistributed(Flatten(),name='flatten'))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
-        model.add(Bidirectional(LSTM(30, return_sequences=False, name='lstm')))
+        model.add(Bidirectional(LSTM(100, return_sequences=False, name='lstm')))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         #model.add(Dense(512, name='fc1-l'))
         #model.add(Activation('relu'))
         #model.add(Dropout(0.5))
-        model.add(Dense(128, name='fc1'))
+        model.add(Dense(64, name='fc1'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name='salida'))
         #model.summary()
 
-        rmsprop = RMSprop(lr=0.0005) # decrease learninf rate
+        # model.add(Activation('relu'))
+        # model.add(Permute((1,2, 4, 3)))
+        # model.add(TimeDistributed(TimeDistributed(TimeDistributed(Dense(40, kernel_regularizer=regularizers.l1(0.01), name='mix_dense_1')))))
+        # model.add(Permute((1,2, 4, 3)))
+        # model.add(TimeDistributed(MaxPooling2D(pool_size=(2, 1))))
+        # model.add(Dropout(0.5))
+        # #model.add(TimeDistributed(Conv2D(kernel_size=(15,1),filters=30, name = 'conv2')))
+        # #model.add(Activation('relu'))
+        # #model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1)),name='pool2'))
+        # #model.add(Dropout(0.5))
+        # #model.add(TimeDistributed(Conv2D(kernel_size=(7,1),filters=20, name = 'conv3')))
+        # #model.add(Activation('relu'))
+        # #model.add(TimeDistributed(MaxPooling2D(pool_size=(2,1))))
+        # #model.add(Dropout(0.5))
+        # model.add(TimeDistributed(Flatten()))
+        # model.add(TimeDistributed(BatchNormalization()))
+        # model.add(Bidirectional(LSTM(40,return_sequences=False)))
+        # model.add(Activation('relu'))
+        # model.add(Dropout(0.5))
+        # model.add(Dense(50, name = 'fc1-l'))
+        # model.add(Activation('relu'))
+        # model.add(Dropout(0.5))
+        # model.add(Dense(30, name = 'fc2-l'))
+        # model.add(Activation('relu'))
+        # model.add(Dropout(0.5))
+        # model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
 
         model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
-                      optimizer=rmsprop)
+                      optimizer='rmsprop')
 
-        name_pretrained_weights = 'c1_energy_lstm_pretrained_pat' + str(lop) + '_weights.h5' # trained over all other patienes
+        name_pretrained_weights = 'c1_square_onlyconv_' + str(lop) + '_weights.h5'
         model.load_weights(name_pretrained_weights, by_name=True)
         model.save_weights('initials.h5')
 
+
+        #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
+        ## Training
+
+        #print(num_negative)
 
         class_weight = {0: 1.0,
                         1: 1.0} #float(num_negative)/float(num_positive)}
@@ -291,7 +234,7 @@ if __name__ == "__main__":
 
         for zz in range(0, num_realizations):
             model.load_weights('initials.h5')
-            nombre_pesos_save = 'c1_lstm_finetune_pat' + str(lop) + '_weights.h5'
+            nombre_pesos_save = 'c1_energy_lstm_pretrained_pat' + str(lop) + '_weights.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             history = model.fit(X_train, Y_train,
                                 batch_size=batch_size,
@@ -340,4 +283,4 @@ if __name__ == "__main__":
     variables_save['results_summary'] = results_summary
 
 
-    savemat(file_name='conv_1d_lstm_fine.mat', mdict=variables_save)
+    savemat(file_name='conv_1d_pre_lstm_todo_whole.mat', mdict=variables_save)

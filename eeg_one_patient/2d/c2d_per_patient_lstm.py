@@ -87,7 +87,7 @@ def list_seizures_patient(patient_number):
     return list_seizures[patient_number-1]
 
 
-def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_sample, isTrain=True, balance=False,bal_ratio=1):
+def data_generator_one_patient(main_folder, patient_number,num_per_series, size_img, leaveout_sample, isTrain=True, balance=False,bal_ratio=1):
     nb_classes = 2
     patient_folder = main_folder + 'chb' + str(patient_number).zfill(2)
     print(patient_folder)
@@ -95,7 +95,7 @@ def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_s
     #print(list_samples)
     if (isTrain):
         # take all series except for the one for testing
-        X = np.zeros(shape=(0, size_img, size_img, 3))
+        X = np.zeros(shape=(0, num_per_series, size_img, size_img, 3))
         Y = np.zeros(shape=(0, 1))
         for sample in list_samples:
             # if is not the one to be tested
@@ -132,7 +132,7 @@ def data_generator_one_patient(main_folder, patient_number, size_img, leaveout_s
         mat_var = loadmat(patient_folder + '/' + 'chb' + str(patient_number).zfill(2) + '_' + str(leaveout_sample).zfill(
                 2) + '_seg.mat')
         X = mat_var['proj_images']
-        X = X.reshape(X.shape[0], size_img, size_img, 3)
+        X = X.reshape(X.shape[0], num_per_series, size_img, size_img, 3)
         Y = mat_var['total_labels']
         X = np.compress((Y != 2).flatten(), X, axis=0) # get rid of pre-ictal
         Y = np.compress((Y != 2).flatten(), Y, axis=0) # get rid of pre-ictal
@@ -151,28 +151,33 @@ if __name__ == "__main__":
     num_classes = 2
     epochs = 50
     size_img = 16
+    num_per_series=30
     #patient_number = 23
     list_all_patients = range(1, 17) + range(18, 24)   
-    model = Sequential()
-    model.add(Conv2D(kernel_size=(3,3),filters=32, input_shape=(size_img, size_img, 3),name='conv1'))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.5))
-    model.add(Conv2D(kernel_size=(3,3),filters=32,name='conv2'))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2,2)))
-    model.add(Dropout(0.5))
-    model.add(Conv2D(kernel_size=(3,3),filters=64,name='conv3'))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.5))
-    model.add(Conv2D(kernel_size=(3,3),filters=64,name='conv4'))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2,2)))
-    model.add(Dropout(0.5))
-    model.add(Flatten())
-    #model.add(BatchNormalization())
-    model.add(Dense(64))
-    model.add(Dropout(0.5))
 
+    model = Sequential()
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
+    model.add(Activation('relu'))
+    #model.add(Dropout(0.5))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
+    model.add(Activation('relu'))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
+    model.add(Dropout(0.5))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
+    model.add(Activation('relu'))
+    #model.add(Dropout(0.5))
+    model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
+    model.add(Activation('relu'))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
+    model.add(Dropout(0.5))
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(Bidirectional(LSTM(128,return_sequences=False)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(512))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
 
 
@@ -184,6 +189,7 @@ if __name__ == "__main__":
     results_summary = np.zeros(shape=(24,4))
     for patient_number in list_all_patients:
 
+ #       name_pretrained_weights = 'cross2d_norm_polar_pat' + str(patient_number) + '_weights_dropall.h5'
         name_pretrained_weights = 'cross2d_norm_polar_pat' + str(patient_number) + '_weights_dropall.h5'
 
         list_seizures = list_seizures_patient(patient_number)
@@ -199,13 +205,13 @@ if __name__ == "__main__":
             model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
                                                save_best_only=True)
             #model.load_weights('initial.h5')  # Reinitialize weights
-            X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los, 
+            X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los, num_per_series=num_per_series,
                                                           isTrain=True, balance=True,bal_ratio=4)
 
             print(X_train.shape)
             print(Y_train.shape)
 
-            X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los, 
+            X_test, Y_test = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los, num_per_series=num_per_series,
                                                         isTrain=False)
 
 
@@ -220,15 +226,15 @@ if __name__ == "__main__":
             medias = list()
             desv_est = list()
             for cc in range(0,3):
-                medias.append(np.mean(X_train[:, :, :, cc]))
-                desv_est.append(np.std(X_train[:, :, :, cc]))
-                X_train[:, :,:, cc] = np.reshape(scale(X_train[:, :,:, cc].flatten()), (X_train.shape[0],16, 16))
+                medias.append(np.mean(X_train[:, :, :, :,cc]))
+                desv_est.append(np.std(X_train[:, :, :, :,cc]))
+                X_train[:, :,:,:, cc] = np.reshape(scale(X_train[:, :,:,:, cc].flatten()), (X_train.shape[0],16, 16))
                 #print(str(np.mean(X_train[:,:,:,cc])))
                 #print(str(np.std(X_train[:, :, :,cc])))
 
             for cc in range(0,3):   
-                X_test[:,:,:,cc] = X_test[:,:,:,cc]-medias[cc]
-                X_test[:,:,:,cc] = (1.0/desv_est[cc])*X_test[:,:,:,cc]
+                X_test[:,:,:,:,cc] = X_test[:,:,:,:,cc]-medias[cc]
+                X_test[:,:,:,:,cc] = (1.0/desv_est[cc])*X_test[:,:,:,:,cc]
             #print(X_test.shape)
 
 

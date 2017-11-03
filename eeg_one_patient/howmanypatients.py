@@ -173,7 +173,11 @@ if __name__ == "__main__":
         model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
                       optimizer='rmsprop')
         model.save_weights('initials.h5')
+        X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
+        Y_test = np_utils.to_categorical(Y_test, 2)
 
+        print(X_test.shape)
+        print(Y_test.shape)
         class_weight = {0: 1.0,
                         1: 1.0} #float(num_negative)/float(num_positive)}
 
@@ -192,13 +196,12 @@ if __name__ == "__main__":
                 print(sum(logic_list))
                 X_train = np.delete(X_data_all, np.where(logic_list), axis=0)
                 Y_train = np.delete(Y_data_all, np.where(logic_list), axis=0)
-                X_test = np.compress((pat_indicator == lop).flatten(), X_data_all, 0)
-                Y_test = np.compress((pat_indicator == lop).flatten(), Y_data_all, 0)
+                #X_test = np.compress((pat_indicator == lop).flatten(), X_data_all, 0)
+                #Y_test = np.compress((pat_indicator == lop).flatten(), Y_data_all, 0)
                 print('train: ' + str(X_train.shape))
                 print('test: ' + str(X_test.shape))
 
                 Y_train = np_utils.to_categorical(Y_train, 2)
-                Y_test = np_utils.to_categorical(Y_test, 2)
 
                 resumen_train = np.zeros(shape=(num_realizations,2))
                 resumen_test = np.zeros(shape=(num_realizations,2))

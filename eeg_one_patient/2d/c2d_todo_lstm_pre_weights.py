@@ -130,118 +130,118 @@ if __name__ == "__main__":
     num_per_series = 30
     
 
-    list_all_patients = range(1, 17) + range(18, 24)   
-
+    #list_all_patients = range(1, 17) + range(18, 24)   
+    list_all_patients = [1,2,3,8,14,22]
     # load the patient of all data
-    X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, size_img=size_img, list_all_patients=list_all_patients, leaveout=50, num_per_series=num_per_series)
-    print('todo: ' + str(X_data_all.shape))
-    num_realizations = 3
+    #contenedor = np.load('2d_30s.npz')
+    #X_data_all = contenedor['X']
+    #Y_data_all = contenedor['Y']
+    #pat_indicator = contenedor['indic']
+    #print('todo: ' + str(X_data_all.shape))
+    num_realizations = 5
 
     results_summary = np.zeros(shape=(24,4,num_realizations))
-    for lop in list_all_patients:
-        print('=== processing patient' + str(lop) +'=====')
-        # separate in training and testing for this patient
-        X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
-        Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
-        print('train: ' +str(X_train.shape))
-        print('test: ' +str(X_test.shape))
+
+    for zz in range(0, num_realizations):
+
+        X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, size_img=size_img, list_all_patients=list_all_patients, leaveout=50, num_per_series=num_per_series)
 
 
-        model = Sequential()
-        model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
-        model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
-        model.add(Activation('relu'))
-        model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
-        #model.add(Dropout(0.5))
-        model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
-        model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
-        model.add(Activation('relu'))
-        model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
-        #model.add(Dropout(0.5))
-        model.add(TimeDistributed(Flatten()))
-        #model.add(TimeDistributed(BatchNormalization()))
-        model.add(Bidirectional(LSTM(128,return_sequences=False)))
-        model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        model.add(Dense(512))
-        model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
-        #model.summary()
+        for lop in list_all_patients:
+            print('=== processing patient' + str(lop) +'=====')
+            # separate in training and testing for this patient
+            X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
+            Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
+            X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
+            Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
+            #X_test, Y_test = data_generator_one_patient(main_folder=main_folder, num_per_series=num_per_series, patient_number=lop, size_img=size_img, balance=False)
+
+            print('train: ' +str(X_train.shape))
+            print('test: ' +str(X_test.shape))
 
 
-        model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
-                      optimizer='rmsprop')
-
-        #model.summary()
-        name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
-        model.load_weights(name_pretrained_weights, by_name=True)
-        model.save_weights('initial.h5')
-
-        #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
-
-        ## Training
-
-
-        #X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=1, size_img=size_img, leaveout_sample=los,
-        #                                              isTrain=True)
-        #list_all_patients = range(1,5)
-        # list_leave = list()
-        # list_leave.append(lop)
-        # list_patients_training = list(set(list_all_patients) - set(list_leave)) # list of patients over which to train
-
-
-        num_positive = 0
-        num_negative = 0
-
-      
-        medias = list()
-        desv_est = list()
-        for cc in range(0,3):
-            medias.append(np.mean(X_train[:, :, :, :, cc]))
-            desv_est.append(np.std(X_train[:, :, :, :, cc]))
-            X_train[:,:,:,:,cc] = np.reshape(scale(X_train[:, :,:,:,cc].flatten()), (X_train.shape[0],num_per_series,size_img, size_img))
-            #print(str(np.mean(X_train[:,:,:,:,cc])))
-            #print(str(np.std(X_train[:, :, :,:,cc])))
-                ###### Load testing data
-        for cc in range(0,3):   
-            X_test[:,:,:,:,cc] = X_test[:,:,:,:,cc]-medias[cc]
-            X_test[:,:,:,:,cc] = (1.0/desv_est[cc])*X_test[:,:,:,:,cc]
-        #print(X_test.shape)
-        #print(Y_test.shape)
-        Y_test = np_utils.to_categorical(Y_test,2)    
-
-        #print(Y_train)
-        num_positive += sum(Y_train == 1)
-        num_negative += sum(Y_train == 0)
-
-        print(num_positive)
-        print(num_negative)
-
-        class_weight = {0: 1.0,
-                        1: 1.0} #float(num_negative)/float(num_positive)}
+            model = Sequential()
+            model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
+            model.add(Activation('relu'))
+            #model.add(Dropout(0.5))
+            model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
+            model.add(Activation('relu'))
+            model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
+            model.add(Dropout(0.5))
+            model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
+            model.add(Activation('relu'))
+            #model.add(Dropout(0.5))
+            model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
+            model.add(Activation('relu'))
+            model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
+            model.add(Dropout(0.5))
+            model.add(TimeDistributed(Flatten()))
+            model.add(TimeDistributed(BatchNormalization()))
+            model.add(Bidirectional(LSTM(128,return_sequences=False)))
+            model.add(Activation('relu'))
+            model.add(Dropout(0.5))
+            model.add(Dense(512))
+            model.add(Activation('relu'))
+            model.add(Dropout(0.5))
+            model.add(Dense(num_classes, activation='softmax', name = 'output_layer'))
+            #model.summary()
 
 
-        Y_train = np_utils.to_categorical(Y_train, 2)
-            #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
-        early_stopping = EarlyStopping(monitor='val_categorical_accuracy', patience=1)
+            model.compile(loss='categorical_crossentropy',metrics=[metrics.mae, metrics.categorical_accuracy],
+                          optimizer='rmsprop')
+
+            #model.summary()
+            name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights_dropall.h5'
+            model.load_weights(name_pretrained_weights, by_name=True)
+            #model.save_weights('initial.h5')
+
+            #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
+
+            ## Training
+
+
+            num_positive = 0
+            num_negative = 0
+
+          
+            medias = list()
+            desv_est = list()
+            for cc in range(0,3):
+                medias.append(np.mean(X_train[:, :, :, :, cc]))
+                desv_est.append(np.std(X_train[:, :, :, :, cc]))
+                X_train[:,:,:,:,cc] = np.reshape(scale(X_train[:, :,:,:,cc].flatten()), (X_train.shape[0],num_per_series,size_img, size_img))
+                #print(str(np.mean(X_train[:,:,:,:,cc])))
+                #print(str(np.std(X_train[:, :, :,:,cc])))
+                    ###### Load testing data
+            for cc in range(0,3):   
+                X_test[:,:,:,:,cc] = X_test[:,:,:,:,cc]-medias[cc]
+                X_test[:,:,:,:,cc] = (1.0/desv_est[cc])*X_test[:,:,:,:,cc]
+            #print(X_test.shape)
+            #print(Y_test.shape)
+            Y_test = np_utils.to_categorical(Y_test,2)    
+
+            #print(Y_train)
+            num_positive += sum(Y_train == 1)
+            num_negative += sum(Y_train == 0)
+
+            print(num_positive)
+            print(num_negative)
+
+            class_weight = {0: 1.0,
+                            1: 4.0} #float(num_negative)/float(num_positive)}
+
+
+            Y_train = np_utils.to_categorical(Y_train, 2)
+                #model.train_on_batch(X_train, Y_train, class_weight=class_weight)
+            #early_stopping = EarlyStopping(monitor='val_categorical_accuracy', patience=1)
 
 
 
-        resumen_train = np.zeros(shape=(num_realizations,2))
-        resumen_test = np.zeros(shape=(num_realizations,2))
-        
-        name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
-        model.load_weights(name_pretrained_weights, by_name=True)
-        model.save_weights('initials')
-        for zz in range(0, num_realizations):
-            model.load_weights('initials')
+            resumen_train = np.zeros(shape=(num_realizations,2))
+            resumen_test = np.zeros(shape=(num_realizations,2))
+            
+            name_pretrained_weights = 'cross2d_norm_polar_pat' + str(lop) + '_weights.h5'
+            model.load_weights(name_pretrained_weights, by_name=True)
             nombre_pesos_save = '2d_lstm_pre_pat' + str(lop) + '_weights.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             #model.load_weights('initial.h5')  # Reinitialize weights
@@ -288,19 +288,12 @@ if __name__ == "__main__":
             results_summary[lop,2,zz] = metrics_test[0]
             results_summary[lop,3,zz] = float(metrics_test[1]) / (float(X_test.shape[0])*30.0 / 3600.0)
 
-        promedio_train = np.average(resumen_train, axis=0)
-        promedio_test = np.average(resumen_test, axis=0)
-
-        print('===total===')
-        print('train: ' + str(promedio_train[0]) + '  ' + str(promedio_train[1]))
-        print('test: ' + str(promedio_test[0]) + '  ' + str(promedio_test[1]))
-
     variables_save = dict()
     variables_save['results_summary'] = results_summary
 
         #with open('objs.pickle', 'w') as f:  # Python 3: open(..., 'wb')
         #    pickle.dump(variables_save, f)
-    savemat(file_name = 'cnn_2d_pre_lstm_todo.mat', mdict=variables_save)
+    savemat(file_name = 'cnn_2d_lstm_resample_wieghted_todo.mat', mdict=variables_save)
 
 
 #    plt.plot(y_pred)

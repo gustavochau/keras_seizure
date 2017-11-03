@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     batch_size = 30
     num_classes = 2
-    epochs = 100
+    epochs = 50
     size_in = 128
     num_channels =23
     num_per_series = 30
@@ -136,18 +136,18 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 5
+    num_realizations = 3
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in list_all_patients:
+    for lop in [2,3,4]: #list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
         Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
-        Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
-        #X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
+        #X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
+        #Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
+        X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
         
         print('train: ' +str(X_train.shape))
         print('test: ' +str(X_test.shape))
@@ -167,13 +167,13 @@ if __name__ == "__main__":
         model.add(TimeDistributed(Flatten(),name='flatten'))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
-        model.add(Bidirectional(LSTM(30, return_sequences=False, name='lstm')))
+        model.add(Bidirectional(LSTM(100, return_sequences=False, name='lstm')))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         #model.add(Dense(512, name='fc1-l'))
         #model.add(Activation('relu'))
         #model.add(Dropout(0.5))
-        model.add(Dense(128, name='fc1'))
+        model.add(Dense(64, name='fc1'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name='salida'))
@@ -283,4 +283,4 @@ if __name__ == "__main__":
     variables_save['results_summary'] = results_summary
 
 
-    savemat(file_name='conv_1d_pre_lstm_todo_subset.mat', mdict=variables_save)
+    savemat(file_name='conv_1d_pre_lstm_todo_whole.mat', mdict=variables_save)

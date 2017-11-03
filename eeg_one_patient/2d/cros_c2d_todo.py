@@ -128,14 +128,19 @@ if __name__ == "__main__":
     #K.set_session(sess)
     batch_size = 128
     num_classes = 2
-    epochs = 50
+    epochs = 30
     size_img = 16
     num_channels =23
 
-    list_all_patients = range(1, 17) + range(18, 24)   
+    #list_all_patients = range(1, 17) + range(18, 24)   
+    list_all_patients = [1,2,3,8,14,22]
 
     # load the patient of all data
     X_data_all,Y_data_all,pat_indicator = data_generator_all_patients(main_folder=main_folder, size_img=size_img, list_all_patients=list_all_patients, leaveout=50)
+    #contenedor = np.load('2d_30s.npz')
+    #X_data_all = contenedor['X']
+    #Y_data_all = contenedor['Y']
+    #pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
 
     results_summary = np.zeros(shape=(24,4))
@@ -152,23 +157,23 @@ if __name__ == "__main__":
         model = Sequential()
         model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv1'))
         model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
+        model.add(Dropout(0.5))
         model.add(Conv2D(kernel_size=(3, 3), filters=32, padding='valid', input_shape=(size_img, size_img, 3),name='conv2'))
         model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
+        model.add(Dropout(0.5))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv3'))
         model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
+        model.add(Dropout(0.5))
         model.add(Conv2D(kernel_size=(3, 3), filters=64, padding='valid',name='conv4'))
         model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
+        model.add(Dropout(0.5))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
         #model.add(BatchNormalization())
         #model.add(Dense(512, name='fc_cnnpura1'))  # ,kernel_regularizer=regularizers.l1(0.01)))
         #model.add(Activation('relu'))
-        model.add(Dropout(0.5))
+        #model.add(Dropout(0.5))
         #model.add(Dropout(0.3))
         model.add(Dense(num_classes, activation='softmax', name='fc_cnnpura3'))
         #model.summary()
@@ -238,7 +243,7 @@ if __name__ == "__main__":
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0,num_realizations):
-            nombre_pesos = 'cross2d_norm_polar_pat' + str(lop) + '_weights_dropdense.h5'
+            nombre_pesos = 'cross2d_norm_polar_pat' + str(lop) + '_weights_dropall.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos, monitor='val_categorical_accuracy', save_best_only=True)
             model.load_weights('initial.h5') # Reinitialize weights
             history = model.fit(X_train, Y_train,
@@ -290,5 +295,5 @@ if __name__ == "__main__":
 
         #with open('objs.pickle', 'w') as f:  # Python 3: open(..., 'wb')
         #    pickle.dump(variables_save, f)
-    savemat(file_name = 'cnn_only_todo.mat', mdict=variables_save)
+    savemat(file_name = 'cnn_only_todo_drop.mat', mdict=variables_save)
         #model.save('lstm_lop' + str(lop))
