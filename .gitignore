@@ -11,7 +11,9 @@
 *.np
 *.npz
 *.pyc
-saved_models/
+eeg_one_patient/saved_models/
+/eeg_one_patient/saved_models/
+
 /eeg_one_patient/.idea/workspace.xml
 **/.idea/**/workspace.xml
 
