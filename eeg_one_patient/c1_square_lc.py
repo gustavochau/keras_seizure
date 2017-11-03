@@ -121,7 +121,7 @@ if __name__ == "__main__":
     #K.set_session(sess)
 
 
-    batch_size = 30
+    batch_size = 128
     num_classes = 2
     epochs = 50
     size_in = 128
@@ -136,18 +136,18 @@ if __name__ == "__main__":
     Y_data_all = contenedor['Y']
     pat_indicator = contenedor['indic']
     print('todo: ' + str(X_data_all.shape))
-    num_realizations = 3
+    num_realizations = 5
 
     results_summary = np.zeros(shape=(24, 4, num_realizations))
 
-    for lop in [2,3,4]: #list_all_patients:
+    for lop in [1]: #list_all_patients:
         print('=== processing patient' + str(lop) +'=====')
         # separate in training and testing for this patient
         X_train = np.delete(X_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
         Y_train = np.delete(Y_data_all, np.where((pat_indicator==lop).flatten()),axis=0)
-        #X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
-        #Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
-        X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
+        X_test = np.compress((pat_indicator==lop).flatten(),X_data_all,0)
+        Y_test = np.compress((pat_indicator==lop).flatten(),Y_data_all,0)
+        #X_test, Y_test = data_generator_one_patient(main_folder = main_folder, patient_number=lop, num_per_series=num_per_series, size_in=size_in)
         
         print('train: ' +str(X_train.shape))
         print('test: ' +str(X_test.shape))
@@ -167,13 +167,13 @@ if __name__ == "__main__":
         model.add(TimeDistributed(Flatten(),name='flatten'))
         model.add((BatchNormalization()))
         model.add(Dropout(0.5))
-        model.add(Bidirectional(LSTM(100, return_sequences=False, name='lstm')))
+        model.add(Bidirectional(LSTM(128, return_sequences=False, name='lstm')))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         #model.add(Dense(512, name='fc1-l'))
         #model.add(Activation('relu'))
         #model.add(Dropout(0.5))
-        model.add(Dense(64, name='fc1'))
+        model.add(Dense(512, name='fc1'))
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(num_classes, activation='softmax', name='salida'))
@@ -210,8 +210,7 @@ if __name__ == "__main__":
                       optimizer='rmsprop')
 
         name_pretrained_weights = 'c1_square_onlyconv_' + str(lop) + '_weights.h5'
-        model.load_weights(name_pretrained_weights, by_name=True)
-        model.save_weights('initials.h5')
+        #model.save_weights('initials.h5')
 
 
         #early_stopping = EarlyStopping(monitor='categorical_accuracy', patience=3)
@@ -233,7 +232,7 @@ if __name__ == "__main__":
         resumen_test = np.zeros(shape=(num_realizations,2))
 
         for zz in range(0, num_realizations):
-            model.load_weights('initials.h5')
+            model.load_weights(name_pretrained_weights, by_name=True)
             nombre_pesos_save = 'c1_energy_lstm_pretrained_pat' + str(lop) + '_weights.h5'
             model_checkpoint = ModelCheckpoint(nombre_pesos_save, monitor='val_categorical_accuracy', save_best_only=True)
             history = model.fit(X_train, Y_train,
@@ -242,8 +241,9 @@ if __name__ == "__main__":
                                 shuffle=True,
                                 validation_split=0.2,
                                 callbacks=[model_checkpoint],
-                                verbose=0, class_weight=class_weight)  # , callbacks=[early_stopping])
+                                verbose=2, class_weight=class_weight)  # , callbacks=[early_stopping])
             model.load_weights(nombre_pesos_save)
+            model.save('saved_models/1d/c1_energy_lstm_pretrained_pat' + str(lop) +'_real'  + str(zz+1))
             score = model.evaluate(X_test, Y_test, verbose=1)
 
             print('=== Training ====')

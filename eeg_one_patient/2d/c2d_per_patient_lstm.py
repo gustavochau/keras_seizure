@@ -104,7 +104,7 @@ def data_generator_one_patient(main_folder, patient_number,num_per_series, size_
                 mat_var = loadmat(main_folder + 'chb' + str(patient_number).zfill(2) + '/' + sample)
                 X_train = mat_var['proj_images']
 		#print(X_train.shape)
-                X_train = X_train.reshape(X_train.shape[0], size_img, size_img, 3)
+                X_train = X_train.reshape(X_train.shape[0],num_per_series, size_img, size_img, 3)
                 Y_train = mat_var['total_labels']
                 X_train = np.compress((Y_train != 2).flatten(), X_train, 0)  # get rid of pre-ictal
                 Y_train = np.compress((Y_train != 2).flatten(), Y_train, 0)  # get rid of pre-ictal
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     #    main_folder = '/media/gustavo/TOSHIBA EXT/epilepsia_data/Data_segmentada_ds1/'
     batch_size = 128
     num_classes = 2
-    epochs = 50
+    epochs = 30
     size_img = 16
     num_per_series=30
     #patient_number = 23
@@ -158,20 +158,20 @@ if __name__ == "__main__":
     model = Sequential()
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32), input_shape=(num_per_series, size_img, size_img, 3),name='conv1'))
     model.add(Activation('relu'))
-    #model.add(Dropout(0.5))
+    model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=32),name='conv2'))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
     model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv3'))
     model.add(Activation('relu'))
-    #model.add(Dropout(0.5))
+    model.add(Dropout(0.5))
     model.add(TimeDistributed(Conv2D(kernel_size=(3,3),filters=64),name='conv4'))
     model.add(Activation('relu'))
     model.add(TimeDistributed(MaxPooling2D(pool_size=(2,2))))
     model.add(Dropout(0.5))
     model.add(TimeDistributed(Flatten()))
-    model.add(TimeDistributed(BatchNormalization()))
+    model.add((BatchNormalization()))
     model.add(Bidirectional(LSTM(128,return_sequences=False)))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
@@ -202,7 +202,7 @@ if __name__ == "__main__":
             model.load_weights(name_pretrained_weights, by_name=True)
 
             name_save_weights = '2d_weights_single_pat' + str(patient_number) + '_sample' + str(los) +'.h5'
-            model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_categorical_accuracy',
+            model_checkpoint = ModelCheckpoint(name_save_weights, monitor='val_loss',
                                                save_best_only=True)
             #model.load_weights('initial.h5')  # Reinitialize weights
             X_train, Y_train = data_generator_one_patient(main_folder=main_folder, patient_number=patient_number, size_img=size_img, leaveout_sample=los, num_per_series=num_per_series,
